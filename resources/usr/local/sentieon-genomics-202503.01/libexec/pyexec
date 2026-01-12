@@ -1,0 +1,24 @@
+#!/bin/sh
+# Copyright (c) 2014-2025 Sentieon Inc. All rights reserved
+install_dir="$SENTIEON_INSTALL_DIR"
+
+for prog in ${SENTIEON_PYTHON:-python python3 python2}
+do
+    vers=$("$prog" --version 2>&1)
+    vers=$(expr "$vers" : 'Python \([0-9]*.[0-9]*\)')
+    [ "$vers" ] || continue
+    if [ -d "$install_dir/lib/python$vers" ]; then
+	PYTHONPATH="$install_dir/lib/python$vers:${PYTHONPATH##:}"
+    fi
+    PYTHONPATH="$install_dir/lib/python/sentieon:${PYTHONPATH##:}"
+    PYTHONPATH="${PYTHONPATH%%:}" # remove trailing :
+    export PYTHONPATH
+    break
+done
+
+mod=$(basename "$0")
+if [ "$mod" = "pyexec" ]; then
+    mod=
+fi
+
+exec "$prog" ${mod:+-m "$mod"} "$@"

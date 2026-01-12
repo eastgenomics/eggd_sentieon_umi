@@ -1,0 +1,726 @@
+Sentieon software for DNA/RNA pipeline analysis
+
+2025-07-11
+Release 202503.01
+Feature: Improved DNAscope model apply speed substantially.
+Bug-Fix: Solved issue in TNscope that could call a false positive in somatic amplicon data.
+Bug-Fix: Solved issue that could produce malformed CRAM file under rare circumstances.
+Bug-Fix: Solved issue in Consensus-based Dedup that could cause an assertion failure when the input is RNA reads with UMI.
+Bug-Fix: Solved issue in DNAscope that caused a segmentation fault when a machine learning model is used on a non-human sample.
+
+2025-04-09
+Release 202503
+Feature: Added support for hybrid short and long-read variant calling.
+Feature: Added support for reading and writing CRAM version 3.1 files.
+Feature: Added support in GVCFtyper algorithm for joint calling DNAscope GVCFs from long reads pipeline.
+Feature: Added support in TNscope algorithm to output FAD, F1R2, and F2R1 annotations. 
+Feature: Added option in GCBias and AlignmentStat algorithms to match with Picard IS_BISULFITE_SEQUENCED option. 
+Feature: Reduced memory utilization in HsMetricAlgo algorithm.
+Bug-fix: Solved issue in driver where minor inconsistencies in alignment `@SQ` records can cause an error.
+Bug-fix: Solved issue in consensus Dedup where paired consensus reads may not have matching read names.
+Bug-fix: Solved issue in LongReadSV algorithm that could cause a crash under rare circumstances.
+Bug-fix: Solved issue in DNAscope and Haplotyper that could cause an assertion when using the --bam_output option.
+Bug-fix: Solved issue in consensus Dedup that would cause the job to hang when --metrics is turned on.
+Bug-fix: Solved issue in TNhaplotyper2 in given mode that may produce incorrect results. 
+Bug-fix: Solved issue in TNscope that missed low-AF variants at the site of germline homozygous variants.
+Other: Removed umi consensus from the software package.
+Other: Removed gnuplot binary from the software package.
+
+2024-07-03
+Release 202308.03
+Feature: Support STAR for ARM based CPUs. 
+Feature: Support minimap2 for ARM based CPUs. 
+Feature: Optimized performance of DNAModelApply on some newer ARM CPUs.
+Feature: Added read filter SimplifyCigarTransform to simplify and standardize cigars. 
+Feature: Added support for consensus and UMI-aware deduplication metrics in Dedup.
+Bug-fix: Solved issue in util sort to handle empty type Z and type H tags in input SAM records. 
+Bug-fix: Solved some phasing issues in the long-reads DNAscope pipeline. 
+Bug-fix: Solved potential stack overflow issue when input bam depth is extremely high. 
+
+2024-02-02
+Release 202308.02
+Feature: Added support in Haplotyper algorithm to output RAW_MQandDP annotation. 
+Feature: Added support in GVCFtyper algorithm for gVCFs containing the RAW_MQandDP annotation.
+Bug-fix: Solved an issue in GVCFtyper that could cause an assertion when input gVCF file's tbi index is from third-party tool. 
+Bug-fix: Solved issue in GVCFtyper that could cause a segmentation fault when input gVCF file is from CombineGVCFs. 
+Bug-fix: Solved issue in TNscope that may miss large INDELs in single-end sequencing data. 
+
+2023-11-17
+Release 202308.01
+Feature: Added support in TNhaplotyper2 algorithm to run in distributed mode.
+Feature: Added support in ContaminationModel algorithm to run in distributed mode. 
+Feature: Added support in OrientationBias algorithm to run in distributed mode. 
+Feature: Added support for CSI index for compressed VCF files. 
+Feature: Maintenance update of GeneEditEvaluator. 
+Feature: Added better error message in util sort when input fastq to aligner is not legitimate. 
+Bug-fix: Solved issue in Haplotyper that could cause an error when using the --bam_output option.
+Bug-fix: Solved issue in TNscope where variants may report incorrect annotations under rare circumstances. 
+Bug-fix: Solved issue in LongReadSV that failed to report variants in non-canonical chromosomes. 
+Bug-fix: Solved issue in util sort when --output_format CRAM is used without a reference. 
+
+2023-08-18
+Release 202308
+Feature: Improved DNAscope pipeline speed and accuracy with a BWA model.
+Feature: Improved long-reads DNAscope pipeline speed and accuracy with minimap2 models.
+Feature: Improved speed of STAR when input format is SAM.
+Feature: Improved speed of deduplication on RNA data.
+Feature: Improved consensus based deduplication and UMI barcode aware deduplication for RNA data.
+Feature: Improved consensus of INDELs in Dedup algorithm. 
+Feature: Improved speed of DNAscope on long-reads small variant call. 
+Feature: Improved machine learning model for TNscope.
+Feature: Introduced LongReadUtil to extract cell barcode from Oxford Nanopore single-cell RNA data.
+Feature: Introduced α-version of GeneEditEvaluator algorithm for genome editing sequence analysis.
+Feature: Added support in Dedup to handle INDEL errors in barcode.
+Feature: Added support to encapsulate multiple machine learning models into a single file. 
+Feature: Added support in GVCFtyper to output PL and ML FORMAT fields.
+Feature: Added support in umi extract to output SAM format. 
+Feature: Added support for small variant calling on Oxford Nanopore data.
+Feature: Maintenance update of STAR.                  
+Feature: Maintenance update of minimap2. 
+Feature: Reduced memory utilization in util sort for long reads.
+Bug-fix: Solved an issue in umi consensus that could cause an assertion failure under rare circumstances.
+Bug-fix: Solved issue in DNAscope that may filter softclip reads at high coverage sites. 
+
+2023-04-26
+Release 202112.07
+Feature: Introduced β-version of consensus based deduplication and UMI barcode aware deduplication for RNA data. 
+Bug-Fix: Solved an issue in Dedup that could cause an assertion failure when the output format is CRAM.
+Bug-Fix: Solved issue in util sort to handle type B tags in input SAM records. 
+Bug-Fix: Improved license server fault tolerance upon extreme high usage demand. 
+
+2022-11-07
+Release 202112.06
+Feature: Added support in LocusCollector and Dedup algorithms to perform consensus based deduplication as well as UMI barcode aware deduplication.
+Feature: Added support in Dedup algorithm to perform UMI barcode error correction. 
+Feature: Added support in GVCFtyper for joint calling DNAscope GVCFs from multiple sequencing platforms into a single multi-sample VCF. 
+Feature: Added support in GVCFtyper for gVCF files without PL fields. 
+Feature: Added support in LongReadSV algorithm to process Oxford Nanopore long reads in addition to PacBio HiFi long reads.
+Feature: Improved TNscope SV to better handle different representations of the same alignment.
+Bug-Fix: Solved issue in umi consensus that could cause a segmentation fault when input has 0-length read. 
+Bug-Fix: Solved issue in GVCFtyper that would produce <NON_REF> alleles under rare circumstances. 
+Bug-Fix: Solved issue that Plot GCBias was left-shifted on some datasets. 
+
+2022-07-28
+Release 202112.05
+Feature: Maintenance update of UltimaReadFilter.
+Feature: Added option in TNscope to control adapter trimming.
+Feature: Added environment variable in bwa mem for bug compatibility. 
+Feature: Added wrapper script for STAR in the bin directory to remove the requirement of setting LD_LIBRARY_PATH.
+Bug-Fix: Solved issue in STAR that printed out extra information with the argument --version.
+Bug-Fix: Solved issue in duplex umi consensus that could output zero-length reads. 
+Bug-Fix: Solved issue in umi consensus that slowed down execution under rare circumstances. 
+Bug-Fix: Solved issue in TNscope such that evidence from overlapping read pairs were not adequately accounted for.
+
+2022-05-25
+Release 202112.04
+Feature: Added support for DNAscope with machine learning model to generate gVCF file for subsequent joint call. 
+Feature: Introduced β-version of LongReadSV algorithm to perform germline structure variant call for long reads. 
+Feature: Added options in InsertSizeMetricAlgo to control the threshold to output FR, TANDEM, RF.
+Feature: Maintenance update of UltimaReadFilter.
+Feature: Improved reference assembly detection logic. 
+ 
+2022-04-25
+Release 202112.03
+Feature: Added support to preprocess reads from Ultima sequencers. 
+
+2022-03-31
+Release 202112.02
+Feature: A license framework to support multiple sequencing platforms.
+Feature: Improved bwa-mem speed on certain ARM CPU. 
+Bug-Fix: Solved issue in GVCFtyper that would produce no-calls in certain ploidies when input is a multi-sample merged gVCF from third party tool. 
+Bug-Fix: Solved issue in DNAscope that could produce no call at zero coverage site when using --given. 
+Bug-Fix: Solved issue that triggered CRAM buffer overflow when minimap2 output zero-length secondary reads. 
+Bug-Fix: Solved issue in minimap2 that would cause the job to hang under rare circumstances. 
+
+2022-01-31
+Release 202112.01
+Feature: Improved accuracy of DNAscope machine learning model compared to NIST truth-sets v4.2.1.
+Bug-Fix: Solved issue in TNscope that missed SNPs with 1% AF under very sensitive settings.
+Bug-Fix: Solved issue in TNscope that failed to report variants when the sequence length is shorter than 30bp.
+Bug-Fix: Solved issue in TNscope that could report incorrect AF number for Amplicon data. 
+Bug-Fix: Solved issue in umi consensus that could cause a crash under rare circumstances. 
+Bug-Fix: Added additional error checks and error reporting in util sort. 
+
+2021-12-15
+Release 202112
+Feature: Improved speed of bwa mem.
+Feature: Improved speed of minimap2 when -x splice:hq argument is used.
+Feature: Improved speed of LocusCollector when input bam has huge number of contigs.
+Feature: Implemented a low memory usage mode for extremely large GVCFtyper jobs.
+Feature: Added option in TNhaplotyper2 to match with GATK --genotype-germline-sites option.
+Feature: Added ELEMENT platform to support Element Biosciences sequencers.
+Feature: Modified TNscope AF output format. 
+Feature: Added support in GVCFtyper to take multi-sample gVCF files with coverage gaps.
+Bug-Fix: Solved matching issue in STAR when using non-default value for chimMultimapNmax.
+Bug-fix: Solved buffer overflow issue in STAR due to base count difference between input R1 and R2.
+Bug-fix: Solved issue in TNhaplotyer2 that could cause matching difference with GATK-4.2.0.0 when the input bam has high QUAL N bases.
+Bug-fix: Solved issue in TNhaplotyper2 that could cause a crash under rare circumstances.
+Bug-fix: Solved minor matching issue in median annotations in TNhaplotyper2.
+Bug-fix: Solved issue that triggered stack overflow when input bam has substantially dense region. 
+Bug-fix: Solved issue in duplex umi consensus that results depend on internal data order.
+Bug-fix: Added additional error checks and error reporting.
+
+2021-10-01
+Release 202010.04
+Feature: Improved speed of Minimap2.
+Feature: Mantainance update of Minimap2
+Bug-Fix: Solved issue in VariantPhaser that could cause a crash under rare circumstances.
+Bug-Fix: Solved issue in VariantPhaser that could output variants out of order.
+Bug-Fix: Solved issue in DNAscope that could cause an error when running with HiFi data.
+Bug-Fix: Reduced memory utilization in DNAscope when using HiFi data aligned with minimap 2.22.
+Bug-Fix: Added additional error checks and error reporting.
+Bug-Fix: Updated sentieon wrapper to default to use python system binary, then python3 and last python2.
+
+2021-07-15
+Release 202010.03
+Feature: Introduced β-version of PacBio HiFi reads pipeline.
+Feature: Introduced β-version of VariantPhaser tool to do read-based phasing for long reads.
+Feature: Introduced β-version of minimap2 aligner for PacBio and Nanopore reads.
+Feature: Added support in the sentieon wrapper to run Sentieon python scripts.
+Bug-Fix: Added additional error checks and error reporting.
+
+2021-04-30
+Release 202010.02
+Feature:  Maintenance update of the TNseq algorithm.
+Feature: Added support in util for amplicon specific primer clipping.
+Feature: Added support to access s3 objects from a region different than the one hosting the bucket. 
+Feature: Improved speed of TNhaplotyper2 for extreme depth cases.
+Feature: Introduced β-version of STAR aligner.
+Bug-Fix: Solved an issue when using CRAM files that could incorrectly report reads as missing the RG under very rare circumstances.
+Bug-Fix: Solved issue in CoverageMetrics that could cause a small run-to-run results difference.
+Bug-Fix: Solved issue when using CRAM that could drop certain malformed reads from output.
+Bug-Fix: Solved issue in TNhaplotyper2 that could cause an error when using the --bam_out option.
+Bug-Fix: Solved issue in TNfilter that would cause an error when encountering unrecognized reference bases.
+Bug-Fix: Solved issue in util sort --umi_post_process that would cause an incorrect BI/BD tag.
+Bug-Fix: Solved issue when reading BAM files with convoluted PGs that would cause a crash. 
+Bug-Fix: Solved issue in TNhaplotyper, TNhaplotyper2 and TNscope that could cause a crash when using options --given and --bam_output.
+Bug-Fix: Solve issue in TNhaplotyper2 that could produce incorrect PS values.
+Bug-Fix: Solved issue in some metrics algorithms that was producing trailing tabs causing an empty column output. 
+Bug-Fix: Added additional error checks and error reporting.
+
+2021-02-15
+Release 202010.01
+Feature: Added support in TNhaplotyper2 for genotyping given alleles.
+Feature: Improved TNscope method for handling read trimming.
+Feature: Added support in TNscope for amplicon specific primer removal.
+Bug-Fix: Added additional error checks and error reporting.  
+Bug-Fix: Fixed issue in TNscope that could report incorrect AD numbers at tri-allelic sites.
+Bug-Fix: Solved issue in ContaminationModel that could calculate incorrect estimates when using very sparse pileups.
+Bug-Fix: Solved issue in Haplotyper that could cause a crash for inputs with high depth close to the start of a non-canonical chromosome.
+Bug-Fix: Solved issue in umi consensus that could cause the sequence and BI/BD to be inconsistent when using duplex UMI.
+Bug-Fix: Solved issue in ContaminationModel that could cause a crash under rare circumstances.
+Bug-Fix: Solved issue that could cause a crash when using the Sentieon libraries with bcl2fastq.
+
+2020-11-16
+Release 202010
+Feature: Reduced memory usage when outputting CRAM files.
+Feature: Maintenance update of the TNseq algorithm.
+Feature: Added DNBSEQ platform to support BGI sequencers.
+Feature: Improve speed of umi consensus when not outputting BI/BD tags.
+Feature: Added support of BGZF compressed interval list files as well as VCF and VCF.gz files.
+Feature: Modified the type of the AD, QSS and RPA FORMAT field in the VCF.
+Feature: Override unlimited stack size limit in Linux to prevent Linux bug with thread local storage allocation.
+Feature: Using an empty interval bed file will result in no processing done, as if the interval had 0 length.
+Bug-Fix: Added additional error checks and error reporting.
+Bug-Fix: Solved issue that would cause a crash when using BAM files containing reads without a sequence.
+Bug-Fix: Added option in util sort to handle supplementary reads after processing with the umi tools.
+Bug-Fix: Solved issue in umi consensus that could cause results to depend on the number of threads.
+Bug-Fix: Solved issue in Haplotyper that could cause an out of bound memory access error in very rare circumstances
+Bug-Fix: Solved issue in util sort that could cause it to hang for single threaded jobs under very rare circumstances.
+Bug-Fix: Solved issue in umi consensus that could cause a segmentation fault.
+Bug-Fix: Solved issue in umi consensus that produced a non informative group 0 histogram when using --min_reads 1.
+Bug-Fix: Error out when creating CRAM file containing reads beyond the reference end.
+Bug-Fix: Solved issue in plot that would not respect the SENTIEON_TMPDIR environmental variable.
+
+2020-09-04
+Release 201911.01
+Feature: Reduced number of temporary files in util sort.
+Feature: Improved UMI consensus calculation for INDELs.
+Feature: Reduced memory usage in UMI tool.
+Feature: Added support in umi extract to read FASTQ files containing UMI tags already extracted.
+Feature: Added support in Dedup metrics to report QCFAIL reads if present.
+Feature: Made the rsID field population from dbSNP more robust.  
+Bug-Fix: Solved issue that would cause a crash when using CRAM files and unmapped reads of zero length.
+Bug-Fix: Solved issue in SequenceArtifactMetricsAlgo that could cause a negative result. 
+Bug-Fix: Solved issue in BWA that could cause an error when using a value larger than 520g for bwt_max_mem option.
+Bug-Fix: Solved issue in the vcflib python library that could cause an error processing VCFs from SVSolver
+Bug-Fix: Added additional error checks and error reporting.
+Bug-Fix: Solved issue in umi extract that could cause a crash.
+Bug-Fix: Solved issue that could slow down merging of large output files.
+Bug-Fix: Solved issue that could generate an incorrect CRAM index file when a slice contained multi contigs.
+Bug-Fix: Solved issue in licsrvr for Mac that could prevent it from stopping when running the --stop command.
+Bug-Fix: Solved issue that could cause a crash when using CRAM files and reads longer than 128KBases.
+Bug-Fix: Solved issue in util sort that could cause a crash with very large SAM records.
+Bug-Fix: Solved issue in Haplotyper that could cause an out of bound memory access error in very rare circumstances
+Bug-Fix: Solved issue in DNAscope that could produce no GT when using --given.
+Bug-Fix: Solved issue in CollectVCMetrics that could cause incorrect results for INDELs straddling beyond the input interval.
+
+2019-11-26
+Release 201911
+Feature: Introduced β-version of tools for processing reads containing UMI sequences.
+Feature: Introduced β-version of software for ARM based CPUs.
+Feature: Added support in ReadWriter to filter reads based on the mapping quality.
+Feature: Maintenance update of BWA
+Feature: Improved speed of util sort on high CPU count servers.
+Feature: Added support in ReadWriter to filter reads based on their flags. 
+Feature: Added support to GVCFtyper to output very small AF numbers in scientific notation.
+Feature: Modified the type of the AD FORMAT field in the VCF.
+Feature: Added support in TNscope to output ID and MATEID in its BND output.
+Bug-Fix: Solved issue in VarCal that could cause a numeric overflow
+Bug-Fix: Solved issue in Haplotyper that could cause a segmentation fault under very rare circumstances.
+Bug-Fix: Solved issue in TNscope calling SVs that would output an invalid AD value for the normal sample, if present.
+Bug-Fix: Solved issue in DNAscope that would prevent generating a GVCF when using sharded mode.
+Bug-Fix: Solved issue in VarCal that would cause an issue when using a VCF containing an INF value annotation.
+Bug-Fix: Solved issue in Haplotyper and DNAscope that would not trim common bases in REF and ALT in a variant with a spanning delete.
+Bug-Fix: Solved issue in TNscope SV calling that could shift the position by a few bases under rare circumstances.
+Bug-Fix: Solved issue in GVCFtyper that would create a SOR=nan for large cohorts
+Bug-Fix: Solved issue in the DNAscope Smith-Waterman that could cause a results difference in very rare circumstances.
+Bug-Fix: Solved issue that could cause an error when inputing sharded VCF files indexed by other tools.
+Bug-Fix: Added additional error checks and error reporting.
+
+2019-10-15
+Release 201808.08
+Bug-Fix: Solved issue in Haplotyper that could create an incorrect tbi index file.
+Bug-Fix: Solved issue in DNAscope and Haplotyper that could cause an assertion when using the --bam_output option.
+Bug-Fix: Solved issue in LocusCollector that could cause an assertion when creating a compressed score file. 
+
+2019-06-30
+Release 201808.07
+Feature: Improved speed of QualCal on high CPU count servers.
+Feature: Improved speed of Dedup on high CPU count servers.
+Feature: Improved speed of GVCFtyper merge for large cohorts.
+Bug-Fix: Solved issue preventing reading CRAM files with slices straddling across multiple contigs; the Sentieon tools do not generate such CRAM files.
+Bug-Fix: Added additional error checks and error reporting.
+Bug-Fix: Solved issue that would cause an error when using BAM files containing incomplete PG records.
+Bug-Fix: Solved issue in GVCFtyper that would cause an error when using phased GT annotation.
+
+2019-05-14
+Release 201808.06
+Bug-Fix: Solved issue in GVCFtyper that could cause an error when using multinomial genotyping and more than 1000 samples.
+
+2019-04-17
+Release 201808.05
+Feature: Improved speed of BWA alignment.
+Feature: Changed default CRAM output version to 3.0.
+Feature: Reduced memory usage when outputting CRAM files.
+Feature: Added error checking in tnhapfilter.
+Feature: Improved accuracy of DNAscope model.
+Feature: Removed Realigner stages from the example files.
+Feature: Added option in Haplotyer and GVCFtyper to use additional genotyping models.
+Bug-Fix: Solved issue in TNhaplotyer2 that could cause a run to run variation in the annotation calculation in 1 out of 100 runs.
+Bug-Fix: Solved issue in BWA that could cause an error when using an extremely large bwt_max_mem option.
+Bug-Fix: Solved issue that could cause an error when reading a CRAM file generated by cramtools.
+Bug-Fix: Improved error reporting.
+
+2018-12-20
+Release 201808.03
+Bug-Fix: Solved issue in TNscope that set the wrong default settings.
+
+2018-12-15
+Release 201808.02
+Feature: Improved speed of TNscope.
+Feature: Added option --trim_soft_clip to TNscope, TNhaplotyper and TNHaplotyper2.
+Feature: Added capability for output BAM from --bam_output option to keep the input BAM RG information.
+Feature: Added option --disable_detector to TNscope to control the type of variants called.
+Feature: Added support in TNscope SV calling to more accurately represent large INS.
+Feature: Added mode to util fqidx to extract a fraction of the reads.
+Feature: Added support in GVCFtyper merge mode to allow input files hosted in an object storage location.
+Feature: Added support for using multiple --interval options.
+Bug-Fix: Solved issue in TNscope that could call a false positive in a site that has a germline call and is neighboring another SNV. 
+Bug-Fix: Improved error reporting.
+Bug-Fix: Solved issue in sentieon script that could prevent using a demo license on a shell that is not BASH.
+Bug-Fix: Solved issue that would prevent BED files containing an interval with identical start and end.
+Bug-Fix: Solved issue in DNAModelApply that would cause an error when the input VCF file is empty.
+Bug-Fix: Solved issue in plot that could cause it to run longer than necessary.
+Bug-Fix: Solved issue in DNAModelApply that would cause an error when over-scheduling.
+Bug-Fix: Solved issue in util sort that could cause an assertion error when over-scheduling.
+Bug-Fix: Solved issue in plot that would generate BQSR PDF plots without AA and AAA context covariate.
+
+2018-09-30
+Release 201808.01
+Feature: Changed the way to run licsrvr and licclnt to require the use of the bin/sentieon wrapper.
+Feature: Improved performance of DNAscope and Machine learning model.
+Feature: Improved speed of Insert Size plotting when the sample has very large insert sizes.
+Bug-Fix: Solved issue in GVCFtyper that could create a non conforming VCF when doing joint calling of DNAscope results.
+Bug-Fix: Solved issue in DNAModelApply that would cause an error when the input file does not contain a ModelID.
+Bug-Fix: Solved issue in Haplotyper when using the --given option that would generate a VCF without the  LowQual filter definition in the header.
+Bug-Fix: Solved issue in tnhapfilter tool to include tumor sample in the header of the VCF.
+
+2018-08-31
+Release 201808
+Feature: Added support in ReadWriter for customized flag read filters.
+Feature: Added support to modify the read group information of an input bam file.
+Feature: Added support in TNscope and TNhaplotyper to output a bam including local reassembly of the reads.
+Feature: Added support in TNModelApply to include command line to the VCF output.
+Feature: Added support to QualCalFilter to keep the base quality scores before recalibration.
+Feature: Introduced TNhaplotyper2 algorithm
+Feature: Added support for outputting CRAM v 3.0 files.
+Feature: Added support in Haplotyper, DNAscope and GVCFtyper to input the expected heterozygosity value used to compute prior likelihoods.
+Feature: Updated interface of plot to better match other tools.
+Feature: Added support for machine learning model for DNAscope
+Feature: Modified the help for driver options to make it more user friendly.
+Feature: Improved speed in Dedup.
+Feature: Added support in Haplotyper, Genotyper and DNAscope to include @PG line in the output header of the --bam_output argument.
+Feature: Updated the @PG information when processing in distribution mode to make it more informative.
+Bug-Fix: Solved issue in GVCFtyper on DNAscope GVCFs that may report incorrect phasing on a multi-allelic variant
+Bug-Fix: Solved issue in util sort that would cause an error in older CPUs.
+Bug-Fix: Added additional error checks and error reporting.
+Bug-Fix: Solved issue in LocusCollector that would cause a crash when running 2 commands in parallel outputting to the same file.
+Bug-Fix: Solved issue in Haplotyper that could create a GVCF with REF allele incorrectly set to N under very rare conditions.
+Bug-Fix: Solved issue in TNscope that may use uninitialized values 
+Bug-Fix: Solved issue in AlignmentStat that would report an incorrect command line in the header of the output file.
+Bug-Fix: Solved issue that could slow down the startup when the LIBDIR contains many files and is stored in a NFS.
+
+2018-07-15
+Release 201711.05
+Bug-Fix: Solved issue in Haplotyper that could create a GVCF file that does not cover the entire region under rare circumstances.
+
+2018-06-19
+Release 201711.04
+Feature: Added support to all BAM writing tools to preserve existing PG tags in the header.
+Bug-Fix: Solved issue in TNscope that could cause an error with references containing small contigs.
+Bug-Fix: Solved issue in SVSolver that could cause a segmentation fault.
+Bug-Fix: Solved issue in Haplotyper when using the --bam_output option that could generate a debug bam file incompatible with other tools.
+Bug-Fix: Solved issue in ApplyVarCal that would generate a non-compliant list of FILTERs if the input file already had existing filters.
+
+2018-04-30
+Release 201711.03
+Feature: Reduced memory usage in GVCFtyper.
+Feature: Improved the speed of BWA alignment.
+Feature: Added command line to output of metrics tools.
+Feature: Reduced memory usage in util sort.
+Feature: Reduced TNscope SV calling runtime for very large samples
+Bug-Fix: Solved issue in GVCFtyper merge when using --split_by_sample that would cause an error in merging files with a large number of samples.
+Bug-Fix: Solved issue in WgsMetricsAlgo that would cause an error under very rare circumstances.
+Bug-Fix: Reduced memory usage in WgsMetricsAlgo and SequenceArtifactMetricsAlgo tools.
+Bug-Fix: Solved issue in SequenceArtifactMetricsAlgo that would produce an error when using reference FASTA files with non-ACGT bases.
+Bug-Fix: Solved issue in WgsMetricsAlgo that would cause an error when the --coverage_cap argument is not within the valid rage.
+Bug-Fix: Solved issue in SequenceArtifactMetricsAlgo that would cause an error when the --context_size argument is not within the valid rage.
+
+2018-03-14
+Release 201711.02
+Feature: Added support for BWA shm mode.
+Feature: Added QC metrics tools: BaseDistributionByCycle, QualityYield, WgsMetricsAlgo, SequenceArtifactMetricsAlgo. 
+Feature: Improved speed in TNscope when calling SVs.
+Feature: Added support in TNscope to show progress report during the SV calling.
+Feature: Reduced memory utilization in TNscope while calling SVs. 
+Feature: Introduced β-version of Windows based tools.
+Feature: Improved speed for the Windows version.
+Feature: Added additional error checks and error reporting.
+Feature: Modified the default behavior in DNAscope when only calling short variants to filter out chimeric reads during genotyping.
+Feature: Reduced memory usage in GVCFtyper.
+Bug-Fix: Solved issue in Haplotyper that would cause an error if the input bam file contained reads where the cigar is composed solely of soft and hard clips.
+Bug-Fix: Solved issue in TNscope that could cause a segmentation fault when using an incomplete bam file.
+Bug-Fix: Solved issue in TNscope that would cause a segmentation fault under rare circumstances.
+Bug-Fix: Solved issue in Haplotyper and DNAscope that could cause an error when using the bam_output option.
+Bug-Fix: Solved issue in Realign that would not do the proper read pairing when dealing with secondary alignments.
+Bug-Fix: Maintenance update on the SVsolver algorithm.
+Bug-Fix: Solved issue in licsrvrv for Windows that would prevent it from working with HTTP proxy servers with authentication. 
+Bug-Fix: Solved issue in GVCFtyper that would produce VCF records with non-conformant MQ0 when the input GVCFs include MQ0 annotation.
+
+2018-01-09
+Release 201711.01
+Feature: Improved speed in QualCal for very small jobs.
+Feature: Added support in licsrvr to report the version.
+Feature: Added support in licsrvr to report an update in the license.
+Bug-Fix: Solved issue in licsrvr that would prevent it from working with HTTP proxy servers that return auth schemes in multiple header lines.
+Bug-Fix: Solved issue in Haplotyper, DNAscope, TNhaplotyper and TNscope that could cause an "illegal instruction" error in AWS.
+Bug-Fix: Solved issue in TNscope that would produce and "Error in function boost" under rare conditions.
+Bug-Fix: Solved issue in util that would prevent running vcfconvert on a compressed vcf.gz file.
+Bug-Fix: Solved issue in Haplotyper and DNAscope that could cause an error when using the --bam_output option.
+Bug-Fix: Reduced memory consumption in Realigner.
+Bug-Fix: Solved issue in TNhaplotyper and TNscope that could incorrectly filter a variant as present in the Panel of Normals when the variant is covered by a DEL present in the PoN.
+Bug-Fix: Change emit_conf value in the sample scripts to use the default value.
+Bug-Fix: Solved issue in TNhaplotyper and TNscope that could produce an assertion error when using a fractured bed file with small intervals close to each other.
+Bug-Fix: Solved issue in TNscope that would prevent the job from finishing when prune_factor is set to 0.
+Bug-Fix: Solved issue in bwa that prevented it from working on certain older AMD cpus.
+
+2017-11-20
+Release 201711
+Feature: Added support in Haplotyper to output a bam including local reassembly of the reads.
+Feature: Introduced β-version of new functionality for applying a Machine Learning model to help with variant filtration in TNscope.
+Feature: Introduced β-version of new functionality for Python based recipe creation to drive the Sentieon tools.
+Feature: Introduced β-version of new product DNAscope for germline variant calling and germline structural variant calling.
+Feature: Added support for printing the command line to stderr log, usually as the first line, before the license check.
+Feature: Added support in QualCal to calculate recalibration tables based on PU if present.
+Feature: Added support in ApplyVarCal to use both SNP and INDEL models in a single command line.
+Feature: Added additional error checks and error reporting.
+Bug-Fix: Solved issue in TNscope SV that would cause an error if the input bam file contained realigned reads with no matching bases.
+Bug-Fix: Solved issue that would cause a crash when using a bam file containing reads with invalid mate tid.
+Bug-Fix: Solved issue in GVCFtyper that could cause a job to incorrectly think there are not enough licenses available when the communication to the license server is slow.
+Bug-Fix: Solved issue in TNscope that failed to detect long INDELs under rare circumstances.
+Bug-Fix: Solved issue in ApplyVarCal that caused the output VCF file to miss the SentieonCommandLine in the header.
+Bug-Fix: Solved issue in TNscope that prevented modifying the max_normalAlt_active option, which could cause loss of variants in areas of extreme depth.
+Bug-Fix: Solved issue in GCBias that would report results for a RG that did not contain any reads.
+Bug-Fix: Solved issue in util that would cause a crash when the bam contained reads whose tid is out of bound.
+Bug-Fix: Solved issue in util stream that would not include the full path of util binary in the PG line of the bam header.
+Bug-Fix: Solved issue in AlignmentStat that would produce an inaccurate PCT_ADAPTER value when the adapter_seq is not null.
+Bug-Fix: Solved issue in ApplyVarCal that would produce incorrect results when using sensitivity 0.
+Bug-Fix: Solved issue in the help of TNhaplotyper that would misrepresente the default pcr_indel_model.
+Bug-Fix: Solved issue in bwa that prevented it from working on certain older AMD cpus.
+Bug-Fix: Solved issue in InsertSizeMetrics that woudl generate a header using space instead of tab.
+
+2017-10-13
+Release 201704.04
+Feature: Added zlib library as a shared library to package.
+
+2017-09-20
+Release 201704.03
+Feature: Added support for using a HTTP proxy with authentication. 
+Bug-Fix: Solved issue that would prevent recalibration tables from older releases from being applied when the bam file RGs have a defined PU.
+Bug-Fix: Solved issue in Realigner that could cause an error under extremely rare circumstances when reads in the input file have inconsistent information. 
+Bug-Fix: Solved issue in TNscope that could incorrectly error out when the tumor_contamination_frac parameter is set to 0.
+Bug-Fix: Solved issue that would prevent using bam files with Contigs lasrger than 300M.
+
+2017-08-17
+Release 201704.02
+Feature: Added support in QualCal to allow input of cycle_val_max parameter.
+Bug-Fix: Solved issue in TNhaplotyper in --detect_pon that would produce a non-compliant VCF.
+Bug-Fix: Solved issue in TNscope in --given mode that would not report records on areas of 0 depth coverage.
+Bug-Fix: Solved issue in CoverageMetrics that would report the wrong cumulative_coverage_counts and coverage.statistics when the input bam had multipe different read groups.
+Bug-Fix: Solved issue in InsertSizeMetricAlgo, GCBias and CoverageMetrics that could report the wrong results for extremely deep (>600x) samples.
+Bug-Fix: Solved issue in Realigner that would cause an error when the input bam file had the wrong MC tag type.
+
+2017-06-10
+Release 201704.01
+Feature: Added additional checks on the input bam files.
+Bug-Fix: Solved issue in Dedup that would cause the algorithm to hang when the bam file has more than 4 billion reads (200x WGS with 150 BP reads).
+Bug-Fix: Solved issue in QualCal that would slow down the calculation.
+Bug-Fix: Solved issue in TNscope that could report the wrong reference allele for structural variants.
+Bug-Fix: Solved issue that could cause a job to hang under extremely rare circumstances.
+Bug-Fix: Solved issue that could cause extra tags in the bam header to disappear.
+
+2017-05-12
+Release 201704
+Feature: Maintenance update of algorithms.
+Feature: Added support for defining a temporary directory, instead of using PWD.
+Feature: Added support for type 2 VCF index files.
+Feature: Added additional error checks and error reporting.
+Feature: Added support for SAC annotation and Allele Specific annotations.
+Feature: Added support for additional read filtering: MapQualFilter and OverclippingFilter.
+Feature: Added support for CollectVCMetrics.
+Feature: Added support for Deduplication equivalent to using bam files sorted by read name.
+Bug-Fix: Solved issue in license control that would prevent run when the SENTIEON_AUTH_DATA is of a specific length.
+Bug-Fix: Solved issue that would not properly parse bed files containing both space and tab delimited fields.
+Bug-Fix: Solved issue in TNscope that would report the wrong REF allele for structural variants.
+Bug-Fix: Solved issue in CoverageMetrics that would produce the wrong summary mean coverage when not using a bed file.
+
+2017-03-15
+Release 201611.03
+Feature: Added support for more options for base quality score recalibration.
+Bug-Fix: Solved issue in GVCFtyper that could report an incorrect GT or PL when the input GVCFs had been processed with different bed files.
+Bug-Fix: Solved issue in Realign that caused reads close to the edge of the contig to be realigned beyond the contig boundary.
+Bug-Fix: Solved issue in Realign that caused a segmentation fault when using known sites VCF including symbolic variants.
+Bug-Fix: Added support for Realign to update NM and MD tags in the realigned reads.
+
+2017-01-31
+Release 201611.02
+Feature: Added support for calling given known variants in Genotyper, Haplotyper, and TNscope.
+Feature: Added support for outputting physical phasing information of variants in TNhaplotyper and TNscope.
+Feature: Added support for base quality correction in streaming mode in util.
+Feature: Maintenance update of HsMetricAlgo. 
+Feature: Removed redundant nthr argument in VarCal. 
+Bug-Fix: Solved issue in TNscope causing excessive memory utilization in the structural variant calling.
+Bug-Fix: Solved issue in TNscope causing a segmentation fault when an output file is not set. 
+Bug-Fix: Solved issue in QualCal in --plot mode that would incorrectly report the need for known sites.
+Bug-Fix: Solved incorrect description of filter low_t_alt_frac in TNscope.
+Bug-Fix: Solved issue in Realign that may set the incorrect bin to the unmapped reads of a mapped/unmapped pair that got its positions adjusted close to a bin boundary.
+
+2016-12-16
+Release 201611.01
+Feature: Removed TNscope temporary files novo_hap.data and novo_sv.data.
+Feature: Increased default license timeout from client request.
+Bug-Fix: Solved issue causing jobs to hang at the end of the processing when there were issues in the network communication.
+Bug-Fix: Solved issue in TNscope causing an assertion error when pairend reads have inconsistent flags. 
+Bug-Fix: Solved issue in TNscope that incorrectly considered reads marked as duplicates in the calculation.
+
+2016-11-20
+Release 201611
+Feature: Added --emit_mode all in GVCFtyper.
+Feature: Updates to β-version of TNscope.
+Feature: Speed improvement to the alignment and sorting tools.
+Feature: Added ContaminationAssessment algorithm for contamination estimation.
+Feature: Added detection of truncated vcf input and corrupted cram input files.
+Bug-Fix: Solved issue in VarCal that would not produce a plot file when the recalibration failed.
+Bug-Fix: Solved issue in VarCal that could cause a segmentation fault when there were not enough licenses for the requested threads.
+Bug-Fix: Solved issue in util sort that would cause a segmentation fault when converting an empty sam file to bam file.
+
+2016-09-17
+Release 201608.01
+Bug-Fix: Solved issue in TNseq in tumor-only mode that added to the output VCF an empty column for non-existent NORMAL sample.
+
+2016-08-31
+Release 201608
+Feature: Introduced β-version of new product TNscope for Tumor-Normal somatic variant calling and structural variant calling.
+Feature: Reduced peak memory utilization in klib for alignment.
+Feature: Speed improvement in the input file loading of GVCFtyper.
+Feature: Speed improvement in the Haplotyper algorithm. 
+Feature: Made VarCal more robust when building the VQSR gaussian models.
+Feature: Cleared up certain error messages to make them more user friendly.
+Bug-Fix: Solved issue in Genotyper that caused a segmentation fault when using var_type BOTH.
+
+2016-07-25
+Release 201606.02
+Feature: Reduced memory utilization in GVCFtyper to reduce requirements for analyss of large (4000+) cohorts.
+Bug-Fix: Solved issue in TNsnv that created VCF files non-conforming to the standard.
+ 
+2016-07-15
+Release 201606.01
+Bug-Fix: Solved issue that prevented licsrvr from serving licenses when the user group list is longer than 1000 characters.
+
+2016-06-31
+Release 201606
+Feature: Maintenance update of TNhaplotyper algorithm (still in β).
+Feature: Added support for RNAseq variant calling.
+Feature: Added online help.
+Feature: Added support for interval padding.
+Bug-Fix: Solved issue that produced no output in TNhaplotyper when using a PoN or no normal sample data.
+Bug-Fix: Solved issue preventing BED file with a header from being used.
+
+2016-05-31
+Release 201603.03
+Feature: Added method for inputting long list of VCF files to GVCFtyper .
+Feature: Added command line to VCF header.
+Feature: Added support for additional annotations on all variant callers.
+Bug-Fix: Solved issue producing an assertion error when too few variants are called.
+Bug-Fix: Solved issue reporting the wrong assembly in the VCF header when the FASTA file cannot be interpreted correctly.
+
+2016-04-29
+Release 201603.02
+Bug-Fix: Solved issue in TNhaplotyper that incorrectly filtered INDELs.
+Bug-Fix: Solved issue in TNsnv and TNhaplotyper that made the dbsnp a required argument.
+Bug-Fix: Solved issue that creates non-conforming vcf files when calling variants in locations where the REF base is M.
+
+2016-03-25
+Release 201603.01
+Feature: Speed improvement in the VQSR algorithm.
+Bug-Fix: Solved issue that caused VQSR to apply to the wrong type of variants when the variants had a prior LOD annotation.
+Bug-Fix: Solved issue that slowed down dedup optical duplicate calculation when the number of duplicates at one locus is too large.
+
+2016-03-11
+Release 201603
+Feature: Maintenance update of algorithms.
+Feature: Added TNseq-snv algorithm for Tumor-Normal and Tumor only somatic variant calling.
+Feature: Added support for CRAM files.
+Feature: Added support for Haploid and Polyploid samples.
+Bug-Fix: Solved issue that droped reads when the reads extended beyond the contig boundary.
+
+2016-02-12
+Release 201601.01
+Bug-Fix: Solved issue in GVCFtyper that produced the wrong variant quality on sites with AAF > 0.5 when using more than 50 samples.
+
+2016-01-31
+Release 201601
+Feature: Added support for using interval files only on the realign target creation portion of Realigner.
+Bug-Fix: Solved issue preventing license server from running in systems with an Infiniband interface.
+Bug-Fix: Solved issue when merging bam files that marks reads as unmapped when their mate is unmapped.
+Bug-Fix: Solved issue in Haplotyper in gvcf mode when intervals are used that causes missed variants when the first interval of a contig contains no variants.
+Bug-Fix: Solved issue in GVCFtyper to remove stray/empty SB annotations from the output VCF.
+Bug-Fix: Solved issue causing the corruption of the output VCF under rare conditions involving large number of samples.
+Bug-Fix: Solved issue that prevented using bam index files without the optional metadata pseudo bin.
+
+2015-12-17
+Release 2015011.01
+Bug-Fix: Solved issue in QualCal algorithm that slowed down execution when using bam files with large number of Read Groups.
+Bug-Fix: Solved issue in ReadWriter algorithm that produced an incorrect bam file when using a recalibration table and an input bam that had PGZ auxiliary data.
+Bug-Fix: Solved issue in VQSR algorithm that caused the execution to hang when using the results from joint calling of more than 20 samples.
+
+2015-11-30
+Release 201511
+Feature: Maintenance update of algorithms.
+Feature: Added depth metrics tool.
+Feature: Added pcr_indel_model flag to Haplotyper tool.
+Feature: Added phasing information to the output of Haplotyper.
+Feature: Added support for compressed vcf/gvcf input and output.
+Feature: Added support for picard style interval files.
+Feature: Added wrapper script to remove requirement of LD_LIBRARY_PATH environmental library.
+Bug-Fix: Added FILTER definition to the VQSR output file header.
+Bug-Fix: Solved issue that would cause an Out of Memory error in BQSR when using interval files.
+Bug-Fix: Solved issue that would cause a crash in IndelRealigner when the bam file has reads with supplementary alignment.
+
+2015-09-20
+Release 201509
+Feature: Reduced resource requirements, including reducing the required maximum number of open files in the system.
+Feature: Various improvements in error reporting.
+Bug-Fix: Solved issue that prevented using multiple bam files as input to algorithms that produced another bam file.
+Bug-Fix: Solved issue that prevented running BQSR when using Read Groups containing spaces.
+Bug-Fix: Solved issue in Haplotyper that could cause an incorrect variant quality score calculation in low coverage regions. The change could be up to 2% in the quality score, for 1 in 100000 variants.
+
+2015-09-02
+Release 201508.01
+Bug-Fix: Solved issue in Realign algorithm that may cause an error when using known sites.
+
+2015-08-31
+Release 201508
+Feature: Enhanced error reporting and error handling when dealing with inconsistent input data
+Feature: Packaged BWA 0.7.12, and removed non-official options for BWA interface. The results of the packaged BWA are identical to the official BWA 0.7.12
+Feature: Grouped the temporary files for VQSR plotting into a single file
+Feature: New license server for large clusters
+Bug-Fix: Solved error in Haplotype Caller when using gvcf emit mode for joint calling 
+Bug-Fix: Solved error in joint calling GVCFtyper that prevented using more than 20 samples
+
+2015-06-30
+Release 201506
+Feature: Added Hybrid Selection Analysis metrics
+Feature: Unified Genotyper default behavior is to call only SNP variants, to be consistent with GATK 3.3 default behavior 
+Bug-Fix: Alignment metrics properly reports unmapped reads when both mates in the pair are unmapped
+Alpha-Feature: Added initial support for joint variant calling of multiple samples that have ben previously processed individually
+
+2015-06-15
+Release 201505.02
+Feature: Speed improvement in Alignment stage
+Feature: Speed improvement in Dedup stage
+Feature: Added support for temporary bam files
+
+2015-06-09
+Release 201505.01
+Bug-Fix: Issue running VQSR in Mac platform
+
+2015-05-31
+Release 201505
+Feature: Speed improvement via AVX optimization
+Feature: Standarized option naming convention
+Feature: tmp folder moved to the same location as the job
+Feature: Added validation checks to input files
+Bug-fix: Solved run to run differences in BQSR when reads have quality scores of 0
+Bug-fix: BQSR applied twice when running variant calling using a recaled bam file
+
+
+2015-03-02
+1. add vqsr
+2. support IONTORRENT platform
+
+2015-01-16
+
+1. Bring the code to be compatible with GATK 3.3
+
+2. Add support for different variant emit modes:
+        --emit_mode=variant     Emit confident variants only (default)
+        --emit_mode=confident   Emit confident variants or reference
+        --emit_mode=all         Emit all sites
+   Applicable to both Genotyper and Haplotyper.
+
+3. Add the ability to generate graphical(pdf) outputs for various reports:
+     o  metrics
+        - MeanQualityByCycle
+        - QualDistribution
+        - GCBias
+     o  BQSR
+
+2014-12-18
+
+1, Add command line options to set calling or emitting confidence thresholds:
+        --algo Genotyper --emit_conf=10 --call_conf=30
+   Applicable to both Genotyper and Haplotyper.
+
+2, Add command line option to set minimum pruning factor in local assembly:
+        --algo Haplotyper --prune_factor=3
+   Applicable to Haplotyper.
+
+3, Add command line option to set chromosome region filters:
+        driver -c /path/to/filter.bed
+   This is a driver level option, therefore applicable to algos.
+
+4, Generate additional variant annotations. Here's the full list,
+        AC, AF, AN, DP, MLEAC, MLEAF, MQ, MQ0, QD, FS,
+        BaseQRankSum, ClippingRankSum, MQRankSum, ReadPosRankSum

@@ -1,0 +1,16 @@
+[Unit]
+Description=Sentieon license server
+After=network.target
+
+[Service]
+Type=forking
+User=sentieon
+Environment=RELDIR=/home/sentieon/release/latest
+Environment=LICDIR=/home/sentieon/licsrvr
+ExecStart=/bin/sh -c 'exec $RELDIR/bin/sentieon licsrvr --log $LICDIR/licsrvr.log --start $LICDIR/licsrvr.lic'
+ExecStop=/bin/sh -c 'exec $RELDIR/bin/sentieon licsrvr --stop $LICDIR/licsrvr.lic'
+Restart=on-abnormal
+RestartSec=32s
+
+[Install]
+WantedBy=multi-user.target

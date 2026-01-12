@@ -1,0 +1,51 @@
+#!/bin/sh
+# Copyright (c) 2014-2025 Sentieon Inc. All rights reserved
+case "$0" in
+/*)     bin_dir=$(dirname "$0");;
+*)      bin_dir=$(dirname "$(pwd)/$0");;
+esac
+case "$bin_dir" in
+*/.)    install_dir="$bin_dir.";;
+*)      install_dir=$(dirname "$bin_dir");;
+esac
+export SENTIEON_INSTALL_DIR="$install_dir"
+
+# load common function definitions
+if [ -f "$install_dir/share/funcs" ]; then
+    . "$install_dir/share/funcs"
+fi
+
+libexec_dir=$install_dir/libexec
+
+cmd=$(basename "$0")
+if [ "$cmd" != "sentieon" ]; then
+    set -- "$cmd" "$@"
+fi
+
+if [ "$#" -eq 0 ]; then
+    echo "Thank you for using Sentieon software. Supported commands are:" 
+    echo "  "$(ls $libexec_dir 2>/dev/null)
+    exit 0
+fi
+
+run=exec; fun=$1; shift
+if [ "$fun" = "ldd" ]; then
+    run=$fun; fun=$1; shift
+fi
+cmd="$libexec_dir/$fun"
+if [ ! -f "$cmd" ]; then
+    echo "Command $fun not found"
+    exit 1
+fi
+
+setup_rtld_path
+setup_data_path
+setup_python_path
+fix_rlimits
+
+# start local license server if needed
+if [ "$#" -gt 1 -a -e "$SENTIEON_LICENSE" ]; then
+    start_local_license_server
+fi
+
+$run $cmd "$@"

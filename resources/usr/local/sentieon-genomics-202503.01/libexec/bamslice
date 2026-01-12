@@ -1,0 +1,189 @@
+#!/bin/sh
+# Copyright (c) 2014-2025 Sentieon Inc. All rights reserved
+# bamslice -i input.bam --shard chr1 --shard chr2 -o output --slice_end 0/1/2/3 --slice_margin 10000
+# slice_end mode:
+# 0: no slice for end, produce output_$i.bam for each shard
+# 1: slice for end, produce output_$i.bam, output_$i_L.bam, output_$i_R.bam for each shard,
+# 2: slice for end only, produce output_$i_L.bam, ouitput_base_$i_R.bam
+# 3: slice for end only, produce output_L.bam, ouitput_base_R.bam, similar to 2, but different naming
+# 
+
+usage()
+{
+    echo "Usage: $1 [options]"
+    echo "Required options:"  
+    echo "    -i, --input"
+    echo "    -o, --output"
+    echo "    -s, --shard"
+    echo "optional options:"  
+    echo "    -r, --reference"
+    echo "    -e, --slice_end"
+    echo "    -m, --slice_margin"
+    echo "    -t, --threads"
+    echo "    -c, --bam_compression"
+    echo "    -d, --dry_run"
+    echo "slice_end mode:"
+    echo "    0: no slice for end, produce output_\$i.bam for each shard"
+    echo "    1: slice for end, produce output_\$i.bam, output_\$i_L.bam, output_\$i_R.bam"
+    echo "       for each shard"
+    echo "    2: slice for end only, produce output_\$i_L.bam, output_\$i_R.bam"
+    echo "    3: slice for end only, produce output_L.bam, output_R.bam, similar to 2,"
+    echo "       but different naming"
+}
+
+#return in $slicing_shard
+create_slicing_shard()
+{
+    shard=$1; j=$(($2+0))
+    if [ $j -eq 0 ]; then
+        echo $shard
+        return
+    fi    
+    # if j != 0, creat slicing shard for left margin or right margin
+    if [ $j -eq 1 ]; then
+        s=${shard%%,*}
+    else
+        s=${shard##*,}
+    fi
+   
+    # parse shard as contig:start-end    
+    contig=${s%%:*}
+    range=${s#*:}
+    if [ "$range" = "$contig" ]; then
+        range=
+    fi
+    if [ -n "$range" ]; then
+        start=${range%%-*}
+        end=${range#*-}
+    fi
+    if [ -z "$start" ]; then
+        start=1
+    fi
+    if [ -z "$end" ]; then 
+        end=2147483647
+    fi
+    start=$((start-1))
+    end=$((end+0))
+    if [ $j -eq 1 ]; then
+        if [ "$contig" != "NO_COOR" ]; then
+            end=$((start+slice_margin))
+            shard="$contig:$((start+1))"-"$end"
+        else
+            shard="NO_COOR_DUMMY_LEFT"
+        fi
+    else
+        if [ "$contig" != "NO_COOR" ]; then
+            start=$((end-slice_margin))
+            if [ $start -lt 0 ]; then
+                start=0
+            fi
+            shard="$contig:$((start+1))"-"$end"
+        else
+            shard="NO_COOR_DUMMY_RIGHT"
+        fi
+    fi
+    echo $shard
+}
+
+reference=
+slice_end=0
+slice_margin=10000
+inputs=
+output=
+shards=
+dry_run="false"
+threads=
+comp_level=
+
+# parsing options, not gnu convention, need be like '-i input' or '--input input'
+while [ $# -gt 0 ]; do
+    opt="$1"
+    shift;
+    case "$opt" in 
+    -r|--reference) reference="$1"; shift;; 
+    -i|--input) inputs="$inputs $1"; shift;;
+    -o|--output) output="$1"; shift;;
+    -s|--shard) shards="$shards $1"; shift;;
+    -e|--slice_end) slice_end="$1"; shift;;
+    -m|--slice_margin) slice_margin="$1"; shift;;
+    -t|--threads) threads="$1"; shift;;
+    -c|--bam_compression) comp_level="$1"; shift;;
+    -d|--dry_run) dry_run="$1"; shift;;
+    -h|--help) usage $0; exit;;
+    *) echo "Unknown option $opt"
+       usage $0
+       exit 2;;
+    esac
+done
+
+if [ -z "$inputs" -o -z "$output" -o -z "$shards" ]; then
+    usage $0
+    exit 2
+fi
+
+slice_end=$((slice_end+0))
+slice_margin=$((slice_margin+0))
+
+concur_count=$BAMSLICE_CONCUR_COUNT
+if [ -z "$concur_count" ]; then
+    concur_count=6
+fi
+concur_count=$((concur_count+0))
+nproc=0
+k=-1
+for shard in $shards; do
+    k=$((k+1))  
+    for j in $(seq 0 2); do
+        j=$((j+0))
+        if [ $slice_end -eq 0 -a $j -ne 0 ]; then
+            continue
+        fi
+        if [ $slice_end -ge 2 -a $j -eq 0 ]; then
+            continue
+        fi
+        cmd="$SENTIEON_INSTALL_DIR/bin/sentieon driver"
+        if [ -n "$reference" ]; then
+            cmd="$cmd -r $reference"
+        fi
+        if [ -n "$threads" ]; then
+            cmd="$cmd -t $threads"
+        fi
+        for i in $inputs; do
+            cmd="$cmd -i $i"
+        done
+        slicing_shard=$(create_slicing_shard $shard $j)
+        cmd="$cmd --shard $slicing_shard"
+        cmd="$cmd --algo ReadWriter"
+        if [ -n "$comp_level" ]; then
+            cmd="$cmd --bam_compression $comp_level"
+        fi
+        if [ $slice_end -eq 3 ]; then
+            out_nameroot=${output%.*}
+            if [ $j -eq 1 ]; then
+                out="$out_nameroot""_L.bam"
+            elif [ $j -eq 2 ]; then
+                out="$out_nameroot""_R.bam"
+            fi        
+        else
+            if [ $j -eq 0 ]; then
+                out="$output""_$k.bam"
+            elif [ $j -eq 1 ]; then      
+                out="$output""_$k""_L.bam"
+            elif [ $j -eq 2 ]; then
+                out="$output""_$k""_R.bam"
+            fi
+        fi
+        cmd="$cmd $out"
+        if [ "$dry_run" = "true" ]; then
+            echo $cmd
+        else
+            sh -c "$cmd" &
+            nproc=$((nproc+1))
+            if [ $nproc -eq $concur_count ]; then
+                wait
+                nproc=0
+            fi
+        fi
+    done
+done
+wait

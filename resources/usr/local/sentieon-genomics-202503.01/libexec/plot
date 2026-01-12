@@ -1,0 +1,1076 @@
+#!/bin/sh
+# Copyright (c) 2014-2025 Sentieon Inc. All rights reserved
+gnuplot="$SENTIEON_INSTALL_DIR/libexec/gnuplot"
+if [ ! -x "$gnuplot" ]; then
+    if type gnuplot >/dev/null 2>&1; then
+        # remove our lib from the search path
+        libdir="$SENTIEON_INSTALL_DIR/lib"
+        LD_LIBRARY_PATH=${LD_LIBRARY_PATH#$libdir}
+        LD_LIBRARY_PATH=${LD_LIBRARY_PATH##:}
+        if [ -z "$LD_LIBRARY_PATH" ]; then
+            unset LD_LIBRARY_PATH
+        fi
+        gnuplot=gnuplot
+    else
+        echo "No gnuplot executable is found" 1>&2
+        exit 1
+    fi
+fi
+
+#global variables
+pagenum=1
+output=
+output_format='pdf'
+tmpdir="$SENTIEON_TMPDIR"
+if [ ! -x "$tmpdir" ]; then
+    tmpdir="/tmp"
+fi
+tmpfiles=
+enableLogo='true'
+logoOn='false'
+kwargs=
+
+#math functions
+max()
+{
+    awk -v n1=$1 -v n2=$2 'BEGIN {printf "%s\n", (n1>=n2?n1:n2)}'
+}
+
+min()
+{
+    awk -v n1=$1 -v n2=$2 'BEGIN {printf "%s\n", (n1<n2?n1:n2)}'
+}
+
+str_append()
+{
+    if [ -z "$1" ]; then
+        echo "$2"
+    else
+        echo "$1 $2"
+    fi
+}
+
+startswith()
+{
+    local found="false"
+    case "$1" in
+    $2*) found="true";;
+    esac
+    echo $found
+}
+
+# mktemp_posix prefix suffix
+mktemp_posix()
+{
+    local t=
+    while :
+    do
+        t="$tmpdir/$1$(od -N4 -tu /dev/urandom | awk 'NR==1 {print $2} {}')$2"
+        if [ ! -e "$t" ]; then
+            touch $t
+            break
+        fi
+    done
+    echo $t
+}
+
+# $(arrayAt string index [delimiter]), default ':' in this module
+# 0-based like python
+arrayAt()
+{
+    local delim=:
+    if [ -n "$3" ]; then
+        delim=$(printf "$3")
+    fi
+    echo "$1" | cut -s -d"$delim" -f$(($2+1))
+}
+
+arrayLen()
+{
+    local delim=:
+    if [ -n "$2" ]; then
+        delim=$(printf "$2")
+    fi
+    IFS_OLD="$IFS"; IFS="$delim"
+    local k=0
+    for i in $1; do
+        k=$((k+1))
+    done
+    IFS="$IFS_OLD"
+    echo $k
+}
+
+kwargs_get()
+{
+    local key=$1; local val=$2
+    for opt in $kwargs; do
+        case $opt in
+        $key=*) val=${opt#*=};;
+        esac
+    done
+    echo "$val"
+}
+
+checkOutput()
+{
+    if [ -z "$output" ]; then
+        printf "Missing output file name\n" 1>&2
+        exit 2
+    fi
+    if ! touch $output; then
+        printf "Cannot open file %s\n" $output 1>&2
+        exit 2
+    else
+        rm $output
+    fi
+    #support png format
+    case "$output" in 
+        *.png)
+            output_format='png'
+            output=${output%.png}
+            ;;
+    esac
+
+}
+        
+getOutput()
+{
+    if [ "$output_format" = "png" ]; then
+        printf "%s-%02d.png" $output $pagenum
+    else
+        echo $output
+    fi
+}
+
+resetOutput()
+{   
+    if [ "$output_format" = "png" ]; then
+        printf "set output \"%s\"\n" $(getOutput)
+    fi
+    pagenum=$((pagenum+1))
+}
+
+init_header()
+{
+    pagenum=1
+    logoOn=false
+    tmpdir=$(kwargs_get "tmpdir" $tmpdir)
+    enableLogo=$(kwargs_get "logo" "true")
+    if [ "$output_format" = "png" ]; then
+        printf 'set terminal pngcairo size 12in, 8in enhanced\n'
+    else
+        printf 'set terminal pdf size 10in, 7.5in enhanced\n'
+    fi
+    printf "set output \"%s\"\n" $(getOutput)
+}
+
+printLogo()
+{
+    if [ "$enableLogo" = "true" ]; then
+        printf 'set label 1 "powered by Sentieon^{/*0.75 TM}" at screen 0.98,0.01 right font "sans,10" tc rgb "#00008B"\n' #darkblue
+        logoOn=true
+    fi
+}
+
+unprintLogo()
+{
+    if [ "$logoOn" = "true" ]; then
+        printf 'unset label 1\n'
+        logoOn=false
+    fi
+}
+
+setScreenMargin()
+{
+    printf 'set lmargin at screen 0.1\nset rmargin at screen 0.9\nset bmargin at screen 0.1\nset tmargin at screen 0.9\n'
+}
+
+clean_tmpfiles()
+{
+    for f in $tmpfiles; do
+        rm $f
+    done
+}
+
+plot_gp()
+{
+    local out_gp=$1
+    if [ -z "$DEBUG_SENTIEON_PLOT" ]; then
+        trap "clean_tmpfiles; rm $out_gp" EXIT
+    fi
+    $gnuplot $out_gp
+}
+
+# tab in key need be converted by printf
+check_plot_file()
+{
+    local what=$1; local key="$2"; local f="$3"
+    if [ $(wc -l $f | awk '{print $1}') = "0" ]; then
+        printf "Empty %s plot file %s, skipped\n" $what $f 1>&2
+        return
+    fi
+    if ! grep -q -E "^$key" $f ; then
+        printf "Incorrect %s plot file %s\n" $what "$f" 1>&2
+        exit 2
+    fi
+}
+
+#xlab/ylab for BQSR plot
+xlab=' '
+ylab=' '
+expand=0
+observ_thr=10000
+
+sharedLabelConvention()
+{
+    local xlabel="$1"; local ylabel="$2"; local k=$3; local n=$4; local direction=$5
+    if [ $n -eq 1 ]; then
+        xlab="$xlabel"; ylab="$ylabel"
+        return
+    fi
+    xlab=' '
+    ylab=' '
+    if [ "$direction" = "x" ]; then
+        if [ $k -eq 0 ] ; then
+            ylab="$ylabel"
+        elif [ $k -eq $((($n-1)/2)) ]; then
+            xlab="$xlabel"
+        fi
+    else
+        if [ $k -eq $((n-1)) ]; then
+            xlab="$ylabel"
+        elif [ $k -eq $((($n-1)/2)) ]; then
+            ylab="$ylabel"
+        fi
+    fi
+}
+
+EventTypes='Base Substitution:Base Insertion:Base Deletion'
+bqsr_write_gp()
+{ 
+    local csv=$1
+    key='ReadGroup,CovariateValue,CovariateName,EventType,Observations,Errors,EmpiricalQuality,AverageReportedQuality,Accuracy,Recalibration'
+    check_plot_file 'QualCal' $key $csv
+    local observ_thr=$(kwargs_get "observations_thr" 10000)
+    local cutoff=$(echo $observ_thr | awk '{printf "%d\n", log($1)/log(10)}')
+    local expand=$(($(kwargs_get "expand" 0) + 0))
+    init_header
+    printf 'set datafile separator ","\n'
+    printf 'unset colorbox\n'
+    printf 'unset xtics\nset tic scale 0\nunset border\n'
+    printf "set palette model RGB defined (-10 \"red\", -%d \"white\", %d \"white\", 10 \"blue\")\n" $cutoff $cutoff
+    if [ $expand -eq 2 ]; then
+        printLogo
+        setScreenMargin
+    fi
+    if [ $expand -eq 0 ]; then
+        resetOutput
+        printLogo
+        printf 'set multiplot layout 3,3 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    local disp_dir='x'
+    if [ $expand -eq 1 ]; then 
+        disp_dir='y'
+    fi
+    local CovariateNames='QualityScore:Cycle:Context'
+    local covIndex=0
+    local xlabel='Reported Quality Score'
+    local ylabel='Empirical Quality Score'
+    local fields='8:7:5'
+    if [ $expand -eq 1 ]; then
+        resetOutput
+        printLogo
+        printf 'set multiplot layout 3,1 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    plot_scattered_3 $csv $(arrayAt "$CovariateNames" $covIndex ':') "$xlabel" "$ylabel" "$fields" $cutoff 'f(x)=x' 0 50 0 50 $disp_dir
+    covIndex=1
+    xlabel='Cycle Covariate'
+    ylabel='Quality Score Accuracy'
+    fields='2:9:5'
+    if [ $expand -eq 1 ]; then
+        printLogo
+        printf 'unset multiplot\n'
+        resetOutput
+        printf 'set multiplot layout 3,1 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    plot_scattered_3 $csv $(arrayAt "$CovariateNames" $covIndex ':') "$xlabel" "$ylabel" "$fields" $cutoff 'f(x)=0' -100 100 -10 10 $disp_dir
+    covIndex=2
+    xlabel='Context Covariate'
+    ylabel='Quality Score Accuracy'
+    fields='0:9:5'
+    if [ $expand -eq 1 ]; then
+        printLogo
+        printf 'unset multiplot\n'
+        resetOutput
+        printf 'set multiplot layout 3,1 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    plot_scattered_baselabel_3 $csv $(arrayAt "$CovariateNames" $covIndex ':') "$xlabel" "$ylabel" "$fields" $cutoff 'f(x)=0' 1 64 -10 10 $disp_dir
+    # print Context cov in another sheet for more detail
+    if [ $expand -eq 0 ]; then
+        printLogo
+        printf 'unset multiplot\n'
+        resetOutput
+        printf 'set multiplot layout 3,3 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    covIndex=0
+    xlabel='Quality Score Covariate'
+    ylabel='Normalized Observations'
+    fields='8:5'
+    if [ $expand -eq 1 ]; then
+        printLogo
+        printf 'unset multiplot\n'
+        resetOutput
+        printf 'set multiplot layout 3,1 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    plot_hist_3 $csv $(arrayAt "$CovariateNames" $covIndex ':') "$xlabel" "$ylabel" "$fields" $cutoff '' 0 55 0 0. $disp_dir
+    covIndex=1
+    xlabel='Cycle Covariate'
+    ylabel='Mean Quality Score'
+    fields='2:8:5'
+    if [ $expand -eq 1 ]; then
+        printLogo
+        printf 'unset multiplot\n'
+        resetOutput
+        printf 'set multiplot layout 3,1 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    plot_scattered_3 $csv $(arrayAt "$CovariateNames" $covIndex ':') "$xlabel" "$ylabel" "$fields" $cutoff '' -100 100 0 50 $disp_dir
+    xlabel='Context Covariate'
+    ylabel='Mean Quality Score'
+    fields='0:7:5'
+    covIndex=2
+    if [ $expand -eq 1 ]; then
+        printLogo
+        printf 'unset multiplot\n'
+        resetOutput
+        printf 'set multiplot layout 3,1 title "Covariates Before(red)/After(blue) Recalibration" font "sans,12"\n'
+    fi
+    plot_scattered_baselabel_3 $csv $(arrayAt "$CovariateNames" $covIndex ':') "$xlabel" "$ylabel" "$fields" $cutoff '' 1 64 20 50 $disp_dir
+}
+
+plot_scattered_3()
+{
+    local csv=$1; cov="$2"; local xlabel="$3"; local ylabel="$4"; 
+    local fields="$5"; local cutoff=$6; local f_str="$7";
+    local xmin=$8; local xmax=$9; local ymin=${10}; local ymax=${11};
+    local direction=${12}
+    if [ -z "$direction" ]; then
+        direction='x'
+    fi
+    printf "set xrange [%f:%f]\nset yrange [%f:%f]\n" $xmin $xmax $ymin $ymax
+    printf 'set xtics font "sans,10"\nset ytics font "sans,10"\n'
+    printf "%s\n" "$f_str"
+    local k=0
+    local narray=3
+    if [ $expand -eq 2 ]; then
+        narray=1
+    fi
+    IFS_OLD="$IFS"; IFS=:
+    for event in $EventTypes; do
+        if [ $expand -eq 2 ]; then
+            resetOutput
+        fi
+        printf "set title \"%s\"\n" $event
+        sharedLabelConvention "$xlabel" "$ylabel" $k $narray $direction
+        k=$((k+1))
+        printf "set xlabel \"%s\"; set ylabel \"%s\"\n" "$xlab" "$ylab"
+        src1=$(printf "\"<(grep '%s.*%s.*%s' %s)\"" $cov $event 'Before' $csv)
+        src2=$(printf "\"<(grep '%s.*%s.*%s' %s)\"" $cov $event 'After' $csv)
+        printf "plot %s u %d:(int(log10(\$%d)) >= %d ? $%d : NaN):(-int(log10(\$5))) notitle w p pt 7 ps .5 palette, %s\n" \
+            "$src1" $(arrayAt "$fields" 0 ":") $(arrayAt "$fields" 2 ":") $cutoff $(arrayAt "$fields" 1 ":") "\\"
+        printf "    %s u %d:(int(log10(\$%d)) >= %d ? $%d : NaN):(int(log10(\$5))) notitle w p pt 7 ps .5 palette, %s\n" \
+            "$src2" $(arrayAt "$fields" 0 ":") $(arrayAt "$fields" 2 ":") $cutoff $(arrayAt "$fields" 1 ":") "\\"
+        printf '    f(x) notitle\n'
+        if [ $expand -ne 2 -a $k -eq 1 ]; then
+            unprintLogo
+        fi
+    done
+    IFS="$IFS_OLD"
+}
+
+plot_scattered_baselabel_3()
+{
+    local csv=$1; cov="$2"; local xlabel="$3"; local ylabel="$4"; 
+    local fields="$5"; local cutoff=$6; local f_str="$7";
+    local xmin=$8; local xmax=$9; local ymin=${10}; local ymax=${11};
+    local direction=${12}
+    if [ -z "$direction" ]; then
+        direction='x'
+    fi
+    printf "set xrange [%f:%f]\nset yrange [%f:%f]\n" $xmin $xmax $ymin $ymax
+    printf 'set xtics font "sans,10"\nset ytics font "sans,10"\n'
+    printf "%s\n" "$f_str"
+    local k=0
+    local narray=3
+    if [ $expand -eq 2 ]; then
+        narray=1
+    fi
+    IFS_OLD="$IFS"; IFS=:
+    for event in $EventTypes; do
+        if [ $expand -eq 2 ]; then
+            resetOutput
+        fi
+        printf "set title \"%s\"\n" $event
+        if [ $k -eq 0 ]; then
+            printf 'set xtics rotate by -90 font "sans,10"\n'
+            printf 'set xrange [0:15]\n'
+        else
+            if [ $direction = 'x' ]; then
+                printf 'set xtics rotate by -90 font "sans,4"\n'
+            else
+                printf 'set xtics rotate by -90 font "sans,10"\n'
+            fi
+            printf 'set xrange [0:63]\n'
+        fi
+        sharedLabelConvention "$xlabel" "$ylabel" $k $narray $direction
+        k=$((k+1))
+        printf "set xlabel \"%s\"; set ylabel \"%s\"\n" "$xlab" "$ylab"
+        local src1=$(printf "\"<(grep '%s.*%s.*%s' %s)\"" $cov $event 'Before' $csv)
+        local src2=$(printf "\"<(grep '%s.*%s.*%s' %s)\"" $cov $event 'After' $csv)
+        printf "plot %s u %s:(int(log10($%d)) >= %d ? $%d : NaN):(-int(log10(\$5))):xtic(2) notitle w p pt 7 ps .5 palette, %s\n" \
+            "$src1" '(column(0))' $(arrayAt "$fields" 2) $cutoff $(arrayAt "$fields" 1) "\\"
+        printf "    %s u %s:(int(log10($%d)) >= %d ? $%d : NaN):(int(log10(\$5))):xtic(2) notitle w p pt 7 ps .5 palette, %s\n" \
+            "$src2" '(column(0))' $(arrayAt "$fields" 2) $cutoff $(arrayAt "$fields" 1) "\\"
+        printf '    f(x) notitle\n'
+        if [ $expand != 2 -a $k -eq 1 ]; then
+            unprintLogo
+        fi
+    done
+    IFS="$IFS_OLD"
+}
+
+# mode 0 by max intensity, mode 1 by area
+normalizeData()
+{
+    local csv=$1; local filter="$2"; local seperator=$3; local fields="$4";
+    local outfile=$5; local mode=$6
+    if [ -z "$mode" ]; then
+        mode=0
+    fi
+    local norm_tmpf=$(mktemp_posix 'SENTIEON_TMP_' '.norm')
+    mode=$((mode+0))
+    local cmd=$(printf "grep '%s' %s | awk -F'%s' '{print $%s, $%s}' | sort -k 1 -n > %s" \
+          "$filter" $csv $seperator $(arrayAt "$fields" 0) $(arrayAt "$fields" 1) $norm_tmpf)
+    sh -c "$cmd"
+    local norm=
+    if [ $mode -eq 0 ]; then
+        norm=$(awk '{if ($2 > sum) sum=$2} END {print sum}' $norm_tmpf) #maxval
+    else
+        norm=$(awk '{sum+=$2} END {printf "%f\n", sum}' $norm_tmpf)
+    fi
+    if [ "$norm" = "0" ]; then
+        echo "0"
+    fi
+    local maxval=$(norm=$norm awk '{if ($5 >= sum) sum=$2/ENVIRON["norm"]} END {printf  "%f\n", sum}' $norm_tmpf)
+    norm=$norm awk '{printf "%s,%f\n", $1, $2/ENVIRON["norm"]}' $norm_tmpf > $outfile
+    rm $norm_tmpf
+    echo $maxval
+}
+
+plot_hist_3()
+{
+    local csv=$1; cov="$2"; local xlabel="$3"; local ylabel="$4"; 
+    local fields="$5"; local cutoff=$6; local f_str="$7";
+    local xmin=$8; local xmax=$9; local ymin=${10}; local ymax=${11};
+    local direction=${12}
+    if [ -z "$direction" ]; then
+        direction='x'
+    fi
+    printf "set xrange [%f:%f]\nset yrange [%f:%f]\n" $xmin $xmax $ymin $ymax
+    printf 'set xtics font "sans,10"\nset ytics font "sans,10"\n'
+    printf 'unset yrange\n'
+    printf 'set style line 1 lc rgb "red"\n'
+    printf 'set style line 2 lc rgb "blue"\n'
+    printf 'set style fill transparent solid 1 noborder\n'
+    local tmpfs=
+    local maxval="0"
+    IFS_OLD="$IFS"; IFS=:
+    for event in $EventTypes; do
+        local tmp1=$(mktemp_posix 'SENTIEON_TMP_' '.before')
+        local tmp2=$(mktemp_posix 'SENTIEON_TMP_' '.after')
+        local val=$(normalizeData $csv $(printf "%s.*%s.*%s" $cov "$event" 'Before') ',' "$fields" $tmp1)
+        maxval=$(max $val $maxval)
+        val=$(normalizeData $csv $(printf "%s.*%s.*%s" $cov "$event" 'After') ',' "$fields" $tmp2)
+        maxval=$(max $val $maxval)
+        tmpfs=$(str_append "$tmpfs" "$tmp1 $tmp2")
+    done
+    IFS="$IFS_OLD"
+    if [ $(awk -v n1=$ymax -v n2=0 'BEGIN {printf "%s\n", (n1<=n2?1:0)}') = "1" ]; then    
+        ymax=$maxval
+        printf "set yrange [%f:%f]\n" $ymin $ymax
+    fi
+    local k=0
+    local narray=3
+    if [ $expand -eq 2 ]; then
+        narray=1
+    fi
+    IFS_OLD="$IFS"; IFS=:
+    for event in $EventTypes; do
+        if [ $expand -eq 2 ]; then
+            resetOutput
+        fi
+        printf "set title \"%s\"\n" "$event"
+        sharedLabelConvention "$xlabel" "$ylabel" $k $narray $direction
+        printf "set xlabel \"%s\"; set ylabel \"%s\"\n" "$xlab" "$ylab"
+        printf "plot \"%s\" u 1:2 w boxes notitle ls 1, %s\n" $(arrayAt "$tmpfs" $((k*2)) " ") "\\"
+        printf "\"%s\" u 1:2 w boxes notitle ls 2\n" $(arrayAt "$tmpfs" $((k*2+1)) " ")
+        k=$((k+1))
+        if [ $expand != 2 -a $k -eq 1 ]; then
+            unprintLogo
+        fi
+    done
+    tmpfiles="$tmpfiles $tmpfs"
+    IFS="$IFS_OLD"
+}
+
+plot_bqsr()
+{
+    local csv=$1
+    out_gp=$(mktemp_posix 'SENTIEON_TMP_' '.gp')
+    bqsr_write_gp $csv > $out_gp
+    plot_gp $out_gp
+}
+
+metrics_write_gp()
+{
+    local inputs="$1"
+    init_header
+    printLogo
+    for i in $inputs; do   
+        k=${i%%=*}
+        v=${i#*=}
+        plot_$k "$v"
+     done
+}
+
+metrics_gp_reset()
+{
+    printf "reset\n"
+    resetOutput
+    setScreenMargin
+    printLogo
+}
+
+plot_gc()
+{
+    local v=$1
+    local window_max=0
+    local key=$(printf "GC\tWINDOWS\tREAD_STARTS\tMEAN_BASE_QUALITY\tNORMALIZED_COVERAGE\tERROR_BAR_WIDTH")
+    local key2=$(printf "ACCUMULATION_LEVEL\tREADS_USED\t$key")
+    local col_offset=0
+    local found=false
+    while IFS="" read line; do
+        if [ "$found" = "false" ]; then
+            case "$line" in
+            \#*) continue;;
+            $key2*) found="true";col_offset=2;;
+            $key*) found="true";;
+            esac
+        else
+            window=$(arrayAt "$line" $((1+col_offset)) "\t")
+            if [ -n "$window" ]; then
+                window=$((window+0))
+                if [ $window -gt $window_max ]; then
+                    window_max=$window
+                fi
+            fi
+        fi
+    done < "$v"
+    if [ "$found" = "false" -o $window_max -le 0 ]; then
+        printf "Incorrect GCBias plot file %s\n" "$v" 1>&2
+        exit 2
+    fi
+    metrics_gp_reset
+    printf "set title 'GC Bias Plot'\n"
+    printf 'set datafile separator "\\t"\n'
+    printf "set xlabel 'GC%% of 100 base windows'\n"
+    printf "set xrange [0:100]\n"
+    printf "set ylabel 'Fraction of normalized coverage'\n"
+    printf "set yrange [0:2]\n"
+    printf "set y2label 'Mean base quality'\n"
+    printf "set y2range [0:40]\n"
+    printf "set y2tics\n"
+    printf "set key left\n"
+    printf "set boxwidth 0.5\n"
+    printf "set style fill solid 1.0\n"
+    printf "plot '%s' every ::1 %s\n" "$v" "\\"
+    # col 1:5:6
+    printf "using %d:%d:%d title 'Normalized Coverage' with errorbars pt 19 ps 1, %s\n"  \
+        $((1+col_offset)) $((5+col_offset)) $((6+col_offset)) "\\"
+    # col 2
+    printf "'' using %d:($%d/%d/2) title 'Windows at GC%%' with boxes, %s\n"  \
+        $((1+col_offset)) $((2+col_offset)) $window_max "\\"
+    # col 4
+    printf "'' using %d:%d axes x1y2 title 'Base Quality at GC%%' with lines\n"  \
+        $((1+col_offset)) $((4+col_offset))
+}
+   
+plot_mq()
+{
+    local v=$1
+    check_plot_file 'MeanQualityByCycle' "$(printf 'CYCLE\tMEAN_QUALITY')" "$v"
+    metrics_gp_reset
+    printf "set title 'Quality by Cycle'\n"
+    printf "set xlabel 'Cycle'\n"
+    printf "set ylabel 'Mean Quality'\n"
+    printf "set yrange [0:]\n"
+    printf "plot '%s' every ::1 title 'Mean Quality' with impulses\n" "$v"
+}
+
+plot_qd()
+{
+    local v=$1
+    check_plot_file 'QualDistribution' "$(printf 'QUALITY\tCOUNT_OF_Q')" "$v"
+    metrics_gp_reset
+    printf "set title 'Quality Score Distribution'\n"
+    printf "set xlabel 'Quality Score'\n"
+    printf "set ylabel 'Observations'\n"
+    printf "set boxwidth 0.5\n"
+    printf "set style fill solid 1.0\n"
+    printf "plot '%s' every ::1 title 'Quality Scores' with boxes\n" "$v"
+}
+
+plot_isize()
+{
+    v=$1
+    # ignore typo using space for tab
+    check_plot_file 'InsertSizeMetricAlgo' "$(printf 'MEDIAN_INSERT_SIZE\tMEDIAN_ABSOLUTE_DEVIATION\tMIN_INSERT_SIZE\tMAX_INSERT_SIZE\tMEAN_INSERT_SIZE\tSTANDARD_DEVIATION\tREAD_PAIRS\tPAIR_ORIENTATION')" "$v"
+    linenum=0
+    ncol=0
+    pass_more_check=true
+    while IFS='' read -r line ; do
+        if [ $(startswith "$line" "#") = "true" ]; then
+            continue
+        fi
+        if [ -z "$line" -o "$line" = "\n" ]; then
+            linenum=0
+            continue
+        fi
+        len=$(($(arrayLen "$line" "\t")+0))
+        if [ $linenum -eq 0 ]; then
+            ncol=$len
+        elif [ $linenum -ge 10000 ]; then #first 10K lines only
+            break
+        else
+            if [ $ncol -ne $len ]; then
+                pass_more_check="false"
+                break
+            fi
+        fi
+        linenum=$((linenum + 1))        
+    done < "$v"
+    if [ "$pass_more_check" = "false" ]; then
+        printf "Empty InsertSizeMetricAlgo data in %s, skipped\n" "$v" 1>&2
+        return
+    fi
+    metrics_gp_reset
+    printf "set title 'Insert Size Histogram'\n"
+    printf "set xlabel 'Insert Size'\n"
+    printf "set ylabel 'Count'\n"
+    printf "set key off\n"
+    if [ $linenum -ge 10000 ]; then
+        printf "set logscale x 10\n"
+    fi
+    printf "plot '%s' every ::1:1 with lines\n" "$v"
+}
+
+
+plot_metrics()
+{
+    inputs="$1"
+    out_gp=$(mktemp_posix 'SENTIEON_TMP_' '.gp')
+    metrics_write_gp "$inputs" > $out_gp
+    plot_gp $out_gp
+}
+
+ps=0.5
+target_titv=2.15
+min_fp_rate=0.001
+vqsr_write_gp()
+{
+    local inputs="$1"; local tranchesFile="$2"
+    ps=$(kwargs_get "point_size" 0.5)
+    target_titv=$(kwargs_get "target_titv" 2.15)
+    min_fp_rate=$(kwargs_get "min_fp_rate" 0.001)
+    init_header 
+    printf 'set datafile separator ","\n'
+    printLogo
+    local len=$(arrayLen "$inputs" " ")
+    if [ $((len % 2 == 1)) = "1" ]; then
+        printf "Incorrect VarCal plot file\n" 1>&2
+        exit 2
+    fi
+    for k in $(seq 1 2 $len); do
+        printf 'unset multiplot\n'
+        vqsr_gp_reset
+        plot_annotation_pair $(arrayAt "$inputs" $((k-1)) " ") $(arrayAt "$inputs" $k " ")
+    done
+    if [ -n "$tranchesFile" ]; then
+        printf 'unset multiplot\n'
+        plot_tranches "$tranchesFile"
+    fi
+}
+
+vqsr_gp_reset()
+{
+    printf "reset\n"
+    resetOutput
+    printLogo
+}
+
+plot_subgraph()
+{
+    local dataf=$1; local field=$2; local what=$3; local neg=$4; local pos=$5
+    printf "set key left top reverse box Left title \"%s\"\n" $what
+    printf "plot \"%s\" u 1:($%d<0 ? \$2 : NaN) title \"%s\" w p pt 6 ps %f lc rgb \"red\", \"\" u 1:($%d>0 ? \$2 : NaN) title \"%s\" w p pt 6 ps %f lc rgb \"blue\"\n" \
+         $dataf $field $neg $ps $field $pos $ps
+}
+
+plot_annotation_pair()
+{
+    local dataf=$1; local simuf=$2
+    printf 'set datafile separator ","\n'
+    line=$(head -1 $dataf)
+    if [ $(($(arrayLen "$line" ",")+0)) -ne 5 ]; then
+        printf "Incorrect ValCal plot file, 5 fields expected\n" 1>&2
+        exit 2
+    fi
+    local xlabel=$(arrayAt "$line" 0 ",")
+    local ylabel=$(arrayAt "$line" 1 ",")
+    printf 'set multiplot layout 2, 2\n'
+    printf "set xlabel \"%s\" noenhanced; set ylabel \"%s\" noenhanced\n" "$xlabel" "$ylabel"
+    printf 'unset key\n'
+    printf 'set pm3d\n'
+    printf 'unset border\n'
+    printf 'set cblabel "lod"\n'
+    printf 'set palette model RGB defined (-4 "red",4 "green")\n'
+    printf 'set cbrange [-4:4]\n'
+    printf 'set title "model PDF"\n'
+    printf "plot \"%s\"  u 1:2:3 w p pt 5 ps 1 palette lw 10\n" $simuf
+    unprintLogo
+    printf 'set title " "\n'
+    printf 'unset colorbox\n'
+    printf 'unset key\n'
+    plot_subgraph $dataf 3 'outcome' 'filt' 'kept'
+    plot_subgraph $dataf 4 'training' 'neg' 'pos'
+    plot_subgraph $dataf 5 'novelty' 'novel' 'known'
+}
+
+plot_tranches()
+{
+    setScreenMargin
+    plot_tranches_titv $1
+    plot_tranches_tpfp $1
+}
+
+# titv vs truth sensitivity
+plot_tranches_titv()
+{
+    vqsr_gp_reset
+    printf 'set datafile separator ","\n'
+    printf 'unset key\n'
+    printf 'set title "Novel Ti/Tv vs truth sensitivy"\n'
+    printf "set xlabel \"%s\"; set ylabel \"%s\"\n" 'Tranche truth sensitivy' 'Novel Ti/Tv ratio'
+    printf "plot \"%s\" u 11:5 with lp pt 6 lt rgb \"blue\"\n" $1
+}
+
+get_titv_fp()
+{
+    max $(min $(echo $1 $2 | awk '{printf "%f\n", 1-($1-0.5)/($2-0.5)}') 1.) $min_fp_rate
+}
+
+# true positive/false positive vs titv
+plot_tranches_tpfp()
+{
+    local tranchesFile=$1
+    local numNovel_idx=2
+    local numTiTv_idx=4
+    local truthSensitivity_idx=10
+    local tranches=
+    local header='targetTruthSensitivity,numKnown,numNovel,knownTiTv,novelTiTv,minVQSLod,filterName,model,accessibleTruthSites,callsAtTruthSites,truthSensitivity'
+    local header_found="false"
+    local field_num=
+    local tmpfile=$(mktemp_posix 'SENTIEON_TMP_' '.tranches.dat')
+    local prev_line=
+    vqsr_gp_reset
+    printf "%s/%s,%s,%s,%s,%s\n" 'Ti/Tv' 'truth' 'cumulativeFP' 'cumulativeTP' 'trancheFP' 'trancheTP' >> $tmpfile
+    while IFS="" read line; do
+        case "$line" in
+        \#*)
+            continue
+            ;;
+        $header)
+            header_found="true"
+            field_num=$(arrayLen "$line" ",")
+            continue
+            ;;
+        *)
+            if [ "$header_found" = "false" ]; then
+                echo "Incorrect tranches file: unknown header line" 1>&2
+                exit 2
+            fi
+            if [ $(arrayLen "$line" ",") != "$field_num" ]; then
+                echo "Incorrect tranches file: field number not consistent" 1>&2
+                exit 2  
+            fi
+
+            fp_rate=$(get_titv_fp $(arrayAt "$line" $numTiTv_idx ",") $target_titv)
+            tp_rate=$(echo $fp_rate | awk '{printf "%f\n", 1 - $1}')
+            numNovel=$(arrayAt "$line" $numNovel_idx ",")
+            numTP=$(echo $tp_rate $numNovel | awk '{printf "%d\n", $1*$2}')
+            numFP=$(echo $numNovel $numTP | awk '{printf "%d\n", $1-$2}')
+            numTS=$(echo $(arrayAt "$line" $truthSensitivity_idx ",") | awk '{printf "%f\n", 100*$1}')
+            if [ -z "$prev_line" ]; then
+                printf "%.3f/%.1f,%s,%s,%s,%s\n" \
+                    $(arrayAt "$line" $numTiTv_idx ",") $numTS \
+                    "0" "0" \
+                    "$numFP" "$numTP" >> $tmpfile
+            else
+                printf "%.3f/%.1f,%s,%s,%s,%s\n" \
+                   $(arrayAt "$line" $numTiTv_idx ",") $numTS \
+                   $prev_numFP $prev_numTP \
+                   $(echo $numFP $prev_numFP | awk '{printf "%f\n", $1-$2}') \
+                   $(echo $numTP $prev_numTP | awk '{printf "%f\n", $1-$2}') >> $tmpfile
+            fi
+            prev_fp_rate=$fp_rate
+            prev_tp_rate=$tp_rate
+            prev_numTP=$numTP
+            prev_numFP=$numFP
+            prev_line="$line"
+            ;; 
+        esac
+    done < "$tranchesFile"
+    tmpfiles="$tmpfiles $tmpfile"
+    setScreenMargin
+    printf "set title \"%s\"\n" 'tranche FP/TP vs Ti/Tv'
+    printf "set xlabel \"%s\"; set ylabel \"%s\"\n"  'Ti/Tv ratio/truth sensitivity' 'numNovel'
+    printf 'set key left top reverse Left box\n'
+    printf 'set datafile separator ","\n'
+    printf 'set style data histogram\n'
+    printf 'set style histogram rowstacked\n'
+    printf 'set style fill solid border rgb "black"\n'
+    printf 'set auto x\n'
+    printf "plot \"%s\" using 2:xtic(1) title column(2) lc rgb \"red\" fillstyle pattern 1, %s\n" $tmpfile "\\"
+    printf "    \"\" using 4:xtic(1) title column(4) lc rgb \"red\", %s\n" "\\"
+    printf "    \"\" using 5:xtic(1) title column(5) lc rgb \"blue\", %s\n" "\\"
+    printf '    "" using 3:xtic(1) title column(3) lc rgb "blue" fillstyle pattern 1\n'
+}
+
+plot_vqsr()
+{
+    local inputs="$1"; tranchesFile="$2"
+    local out_gp=$(mktemp_posix 'SENTIEON_TMP_' '.gp')
+    tmpfiles=
+    # split into multiple files with data and simu files in pairs, assuming separated by '#' lines
+    if [ $(arrayLen "$inputs" " ") = "1" ]; then
+        plotfile="$inputs"
+        if [ $(wc -l "$plotfile" | awk '{print $1}') = "0" ]; then
+            printf "Empty %s plot file %s, skipped\n" 'VarCal' $plotfile 1>&2
+            return
+        fi
+        key='outcome,tra*ning,known'
+        found="false"
+        inputs=
+        count=0
+        linenum=0
+        tmpf=
+        while IFS="" read line; do
+            if [ $(startswith "$line" "#") = "true" ]; then
+                tmpf=
+                continue
+            fi
+            if [ "$found" = "false" ]; then
+                case "$line" in
+                *$key*) found="true";;
+                *) break;;
+                esac                
+            fi            
+            if [ -z "$tmpf" ]; then
+                if [ $count -eq 0 ]; then
+                    tmpf=$(mktemp_posix 'SENTIEON_TMP_' '.txt')
+                    count=1
+                else
+                    tmpf=$(mktemp_posix 'SENTIEON_TMP_' '.txt')
+                    count=0
+                fi
+                tmpfiles="$tmpfiles $tmpf"
+                inputs=$(str_append "$inputs" "$tmpf")
+            fi
+            echo $line >> $tmpf
+        done < $plotfile
+        if [ "$found" = "false" ]; then
+            printf "Incorrect VarCal plot file %s\n" $plotfile 1>&2
+            exit 2
+        fi
+    fi
+    vqsr_write_gp "$inputs" "$tranchesFile" > $out_gp
+    plot_gp $out_gp
+}
+
+usage()
+{
+    echo "Usage: $1 <command> -o output.pdf [options]"
+    echo
+    echo "Commands:"
+    echo "  plot QualCal -o output.pdf input.csv"
+    echo "  plot VarCal -o output.pdf --plot_file plot_data_file [--tranches_file tranchesFile] [--target_titv 2.15] [--min_fp_rate 0.001] [--point_size 0.5]"
+    echo "  plot GCBias|QualDistribution|InsertSizeMetricAlgo|MeanQualityByCycle -o output.pdf metrics.txt"
+#    echo "  plot metrics -o output.pdf --gc gc.txt --mq mq.txt --qd qd.txt --isize insert_size.txt"
+}
+
+prog=$0
+if [ $# -lt 3 ]; then
+    usage $prog
+    exit 0
+fi
+fun=$1; shift
+
+case "$fun" in
+    bqsr|QualCal)
+        if [ $# -lt 1 ]; then
+            usage $prog
+            exit 2
+        fi
+        while [ $# -gt 0 ]; do
+            case "$1" in
+            -o|--output) output="$2"; shift;shift;;
+            --observations_thr|--expand)
+                key=${1#--}    
+                kwargs=$(str_append "$kwargs" "$key=$2"); 
+                shift;shift;;
+            --*)
+                printf "Unknown option %s\n" $1 1>&2
+                exit 2;;
+            *=*) kwargs=$(str_append "$kwargs" "$1");shift;;
+            *) inputs=$(str_append "$inputs" "$1");shift;;
+            esac
+        done
+        checkOutput
+        if [ -n "$inputs" ]; then
+            csv="$inputs"
+        fi
+        if [ ! -n "$csv" ]; then
+            echo "Missing input plot file" 1>&2
+            exit 2
+        fi
+        if [ ! -e "$csv" ]; then
+            printf "Cannot open file %s\n" $csv 1>&2
+            exit 2
+        fi
+        plot_bqsr $csv
+        ;;
+    GCBias|QualDistribution|InsertSizeMetricAlgo|MeanQualityByCycle)
+        case "$fun" in
+            GCBias) key="gc";;
+            QualDistribution) key="qd";;
+            MeanQualityByCycle) key="mq";;
+            InsertSizeMetricAlgo) key="isize";;
+        esac
+        inputs0=
+        while [ $# -gt 0 ]; do
+            case "$1" in
+            -o|--output) output="$2"; shift;shift;;
+            --*)
+                printf "Unknown option %s\n" $1 1>&2
+                exit 2;;
+            *=*) kwargs=$(str_append "$kwargs" "$1");shift;;
+            *)
+                inputs0=$(str_append "$inputs0" "$1");shift;;
+            esac
+        done
+        checkOutput
+        inputs=
+        for f in $inputs0; do
+            if [ ! -e "$f" ]; then
+                printf "Cannot open file %s\n" "$f" 1>&2
+                exit 2
+            fi
+            inputs=$(str_append "$inputs" "$key=$f")
+        done
+        plot_metrics "$inputs"
+        ;;
+    metrics)
+        inputs=
+        while [ $# -gt 0 ]; do
+            case "$1" in
+            -o|--output) output="$2"; shift;shift;;
+            --gc|--mq|--qd|--isize)
+                key=${1#--}    
+                inputs=$(str_append "$inputs" "$key=$2"); 
+                shift;shift;;
+            gc=*|mq=*|qd=*|isize=*) inputs=$(str_append "$inputs" "$1");shift;;
+            --*)
+                printf "Unknown option %s\n" $1 1>&2
+                exit 2;;
+            *=*) kwargs=$(str_append "$kwargs" "$1");shift;;
+            *) 
+                printf "Extra option %s\n" $1 1>&2
+                exit 2;;
+            esac
+        done
+        checkOutput
+        for opt in $inputs; do
+            v=${opt#*=}
+            if [ ! -e "$v" ]; then
+                printf "Cannot open file %s\n" "$v" 1>&2
+                exit 2
+            fi
+        done
+        if [ ! -n "$inputs" ]; then
+            echo "Missing input metrics files" 1>&2
+            exit 2
+        fi
+        plot_metrics "$inputs"
+        ;;
+    vqsr|VarCal)
+        if [ $# -lt 1 ]; then
+            usage $prog
+            exit 2
+        fi
+        k=0
+        inputs=
+        while [ $# -gt 0 ]; do
+            case "$1" in
+            -o|--output) output="$2"; shift;shift;;
+            --tranches_file|--plot_file|--target_titv|--min_fp_rate|--point_size)
+                key=${1#--}    
+                kwargs=$(str_append "$kwargs" "$key=$2"); 
+                shift;shift;;
+            --*)
+                printf "Unknown option %s\n" $1 1>&2
+                exit 2;;
+            *=*) kwargs=$(str_append "$kwargs" "$1");shift;;
+            *) inputs=$(str_append "$inputs" "$1");shift;;
+            esac
+        done
+        checkOutput
+        tranchesFile=$(kwargs_get "tranches_file")
+        if [ -n "$tranchesFile" -a ! -e "$tranchesFile" ]; then
+            printf "Cannot open file %s\n" "$tranchesFile" 1>&2
+            exit 2
+        fi
+        inputfile=$(kwargs_get "plot_file")
+        if [ -n "$inputfile" ];  then
+            inputs=$(str_append "$inputs" "$inputfile")
+        fi
+        if [ -z "$inputs" ]; then
+            printf "Missing input plot file" 1>&2
+            exit 2
+        fi
+        for inputfile in $inputs; do
+            if [ ! -e $inputfile ]; then
+                printf "Cannot open file %s\n" $inputfile 1>&2
+                exit 2
+            fi
+        done
+        plot_vqsr "$inputs" "$tranchesFile"
+        ;;
+    --help)
+        usage $prog
+        exit 0
+        ;;
+    *)
+        printf "Unknown function %s\n" $fun 1>&2
+        usage $prog
+        exit 2
+        ;;
+esac

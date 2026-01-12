@@ -1,0 +1,95 @@
+#!/bin/sh
+# Copyright (c) 2014-2025 Sentieon Inc. All rights reserved
+# copy file in range.
+# range start-end is 0-based, EXCLUSIVE! 
+# If end doesn't exist, read to the end of file.
+# support urls of type with known command handler
+#
+# curl: http://, https://, ftp://, sftp://, file://
+# aws as3api get-object: s3://
+# gsutil cat: gs://
+#
+# user need make sure curl/aws/gsutil are installed.
+if [ -z "$1" ]; then
+    echo "Usage: $0 file [start-[end]]"
+    exit 0
+fi
+url=$1
+range=$2
+
+# change range convention from exclusive to inclusive for the lower level tools
+start=${range%%-*}
+if [ "$start" != "$range" ]; then
+    end=${range#*-}
+    if [ -n "$end" ]; then
+        end=`expr $end - 1`
+        range="$start-$end"
+    fi
+fi
+
+if [ -f "$url" ]; then
+    # need convert to full path for regular file for file:// protocol
+    case "$url" in
+    /*) ;;
+    *) t=$(dirname "$(pwd)/$url"); url="$t/$(basename $url)";;
+    esac
+    url="file://$url"
+fi
+
+exec 3>&1
+case $url in
+file://*|http://*|https://*|ftp://*|ftps://*)
+    if [ ! -x "$(which curl)" ]; then
+        echo "curl not installed!" 1>&2
+        exit 69
+    fi
+    if [ -z "$range" ]; then
+        output=$(curl $url 2>&1 1>&3)
+    else
+        output=$(curl -r $range $url 2>&1 1>&3)
+    fi
+    rc=$?
+;;
+gs://*)
+    if [ ! -x "$(which gsutil)" ]; then
+        echo "gsutil not installed!" 1>&2
+        exit 69
+    fi
+    if [ -z "$range" ]; then
+        output=$(gsutil cat $url 2>&1 1>&3)
+    else
+        output=$(gsutil cat -r $range $url 2>&1 1>&3)
+    fi
+    rc=$?
+;;
+s3://*)
+    if [ ! -x "$(which aws)" ]; then
+        echo "aws not installed!" 1>&2
+        exit 69
+    fi
+    tmp=${url#s3://}
+    bucket=${tmp%%/*}
+    key=${tmp#"$bucket/"}
+    if [ -z "$range" ]; then
+        output=$(aws s3api get-object --bucket $bucket --key $key /dev/fd/3 \
+            2>&1)
+    else
+        output=$(aws s3api get-object --bucket $bucket --key $key --range bytes=$range \
+            /dev/fd/3 2>&1)
+    fi
+    rc=$?
+;;
+*)
+    output="url not supported!"
+    rc=69
+;;
+esac
+
+exec 3>&-
+if [ -n "$DEBUG_SENTIEON_RCAT" -o $rc -ne 0 ]; then
+    echo $0 $@ 1>&2
+    echo $output 1>&2
+fi
+exit $rc
+
+

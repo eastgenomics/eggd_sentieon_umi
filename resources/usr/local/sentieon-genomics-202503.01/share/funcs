@@ -1,0 +1,76 @@
+# Copyright (c) 2014-2025 Sentieon Inc. All rights reserved
+
+start_local_license_server()
+{
+    local licsrvr licfile logfile timeout
+
+    [ "$fun" = "licsrvr" ] && return
+
+    licsrvr="$install_dir/libexec/licsrvr"
+    licfile="$SENTIEON_LICENSE"
+    logfile="${TMPDIR:-/tmp}/licsrvr.log"
+
+    #check if this is a localhost license
+    if grep -q '^MachineID: *localhost:[0-9]*' "$licfile"; then
+        timeout=0
+        #check if licsrvr is running
+        while ! "$licsrvr" --ping "$licfile" 2>/dev/null; do
+            "$licsrvr" --start --log "$logfile" --linger 300 "$licfile"
+            sleep 1
+            timeout=$(($timeout+1))
+            if [ $timeout -eq 30 ]; then
+                echo "License server could not be started" >&2
+                echo "Please check $logfile for more information" >&2
+                exit 2
+            fi
+        done
+    fi
+}
+
+setup_rtld_path()
+{
+    local libdir
+
+    libdir="$install_dir/lib"
+
+    case "$(uname)" in
+    Darwin)
+        ;;
+    CYGWIN*)
+        PATH="${PATH:+$PATH:}$libdir"
+        export PATH
+        ;;
+    *)
+        if [ -f "$libdir/patch.so" ]; then
+            LD_PRELOAD="$libdir/patch.so${LD_PRELOAD:+:$LD_PRELOAD}"
+            export LD_PRELOAD
+        fi
+        LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        export LD_LIBRARY_PATH
+        ;;
+    esac
+}
+
+setup_data_path()
+{
+    export FONTCONFIG_FILE="$install_dir/etc/fonts/fonts.conf"
+    export XDG_DATA_HOME="$install_dir/share"
+}
+
+setup_python_path()
+{
+    [ "$fun" != "driver" -a "$fun" != "util" ] && return
+}
+
+fix_rlimits()
+{
+    case "$(uname)" in
+    Linux)
+        # workaround https://sourceware.org/bugzilla/show_bug.cgi?id=11787
+        if [ "$(ulimit -Ss)" = "unlimited" ]; then
+                ulimit -Ss 10240
+        fi
+        ;;
+    *)  ;;
+    esac
+}

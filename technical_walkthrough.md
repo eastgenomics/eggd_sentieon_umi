@@ -70,7 +70,7 @@ The top-level layout is:
 
 - **`dxapp.json`** — DNAnexus app manifest: input/output spec, runtime configuration, instance requirements, and access rules.
 - **`src/code.sh`** — The sole bash entry-point executed by the DNAnexus worker.
-- **`resources/home/dnanexus/`** — Helper scripts placed into `/home/dnanexus/` on the worker: license discovery, authentication, and refresh logic.
+- **`resources/home/dnanexus/`** — Helper scripts placed into `/home/dnanexus/` on the worker: licence discovery, authentication, and refresh logic.
 - **`resources/usr/bin/samtools`** — Bundled samtools binary.
 - **`resources/usr/local/sentieon-genomics-202503.01/`** — The full Sentieon v202503.01 distribution: the `sentieon` CLI, libexec workers (`bwa`, `umi`, `driver`, `bamslice`, `minimap2`, `STAR`, …), shared libraries, and Python VCF utilities.
 
@@ -103,7 +103,7 @@ jq '{name,title,summary,version,categories,openSource}' dxapp.json
 
 ### Input specification
 
-The app defines 13 inputs across four logical groups.
+The app defines 17 inputs across four logical groups.
 
 <details>
 <summary>Full input spec</summary>
@@ -263,12 +263,12 @@ Key runtime details:
 
 - **OS**: Ubuntu 20.04
 - **Entry point**: `src/code.sh` (bash interpreter)
-- **Instance**: `mem1_ssd1_v2_x36` (36 vCPUs, ~240 GB RAM) in `aws:eu-central-1`
+- **Instance**: `mem1_ssd1_v2_x36` (36 vCPUs, 72 GB RAM) in `aws:eu-central-1`
 - **Timeout**: 24 hours
 - **System package dependency**: `rename` (Perl rename utility, installed at job start via `apt-get`)
 - **DNAnexus asset dependency**: `htslib_suite_asset` v1.22 (provides htslib/bgzf shared libraries at `/opt/dnanexus/assets/htslib/lib`)
-- **Network access**: unrestricted (required for Sentieon license server contact)
-- **Project access**: `CONTRIBUTE` on all projects (required for reading license records)
+- **Network access**: unrestricted (required for Sentieon licence server contact)
+- **Project access**: `CONTRIBUTE` on all projects (required for reading licence records)
 
 ## Pipeline Walkthrough — `src/code.sh`
 
@@ -280,7 +280,7 @@ Before any module runs, `code.sh` does three things:
 
 1. Sets `set -eo pipefail` — the script exits immediately on any non-zero exit code or failed pipe.
 2. Installs `gnuplot` (used later by `sentieon plot metrics` to render the PDF metrics report).
-3. Sources `license_setup.sh`, which discovers the Sentieon license, exports all required `SENTIEON_*` environment variables, and validates the license with a `licclnt ping` before any compute is attempted.
+3. Sources `license_setup.sh`, which discovers the Sentieon licence, exports all required `SENTIEON_*` environment variables, and validates the licence with a `licclnt ping` before any compute is attempted.
 
 <details>
 <summary>Initialisation block — <code>src/code.sh</code> lines 1–10</summary>
@@ -448,7 +448,7 @@ sentieon umi extract [--duplex] <read_template> R1.fq.gz R2.fq.gz
 
 Three stages run end-to-end without intermediate files:
 
-1. **`sentieon umi extract`** — Parses the read template string to locate the UMI bases in each read, strips them from the sequence, and writes them into SAM auxiliary tags (`RX` for the UMI, and others). The `-d` / `--duplex` flag enables duplex-UMI mode where both strands carry an identical UMI structure.
+1. **`sentieon umi extract`** — Parses the read template string to locate the UMI bases in each read, strips them from the sequence, and writes them into SAM auxiliary tags (`XR` for the UMI, and others). The `-d` / `--duplex` flag enables duplex-UMI mode where both strands carry an identical UMI structure.
 2. **`sentieon bwa mem`** — Multi-threaded BWA-MEM alignment. The `-p` flag indicates interleaved paired-end input; `-C` passes through SAM auxiliary tags (including the UMI tags from step 1) to the output. The `@RG` header is injected here (ID, PL, PU, LB, SM).
 3. **`sentieon util sort`** — Converts SAM → BAM and sorts by coordinate, using configurable compression (`bam_compression` 1/6/9) and 2 GB block size for I/O efficiency.
 
@@ -515,9 +515,9 @@ Outputs are uploaded asynchronously using a custom `upload()` / `streaming_uploa
 
 The `wait_uploads()` function polls for sentinel files (`uploaded_<handle>.file`) created by `dx upload` on success, and surfaces upload errors via `uploaded_<handle>.file.error` files without immediately aborting the job.
 
-## License Management — `resources/home/dnanexus/`
+## Licence Management — `resources/home/dnanexus/`
 
-Sentieon requires a valid license to run. The three helper scripts handle discovery, setup, and ongoing refresh of the license token.
+Sentieon requires a valid licence to run. The three helper scripts handle discovery, setup, and ongoing refresh of the licence token.
 
 <details>
 <summary><code>license_setup.sh</code></summary>
@@ -571,25 +571,25 @@ ${SENTIEON_INSTALL_DIR}/bin/sentieon licclnt ping -s $SENTIEON_LICENSE 2> >(tee 
 
 </details>
 
-The license workflow proceeds as follows:
+The licence workflow proceeds as follows:
 
-1. **`helper_funcs.sh:find_license_project`** — Identifies the correct DNAnexus project holding the Sentieon license record. It searches for projects owned by `user-sentieon_license`, tagged `Sentieon_License`, first shared with the billing org, then with collaborator orgs, then with the launching user. Non-expired purchased licenses are preferred over EVAL licenses.
+1. **`helper_funcs.sh:find_license_project`** — Identifies the correct DNAnexus project holding the Sentieon licence record. It searches for projects owned by `user-sentieon_license`, tagged `Sentieon_License`, first shared with the billing org, then with collaborator orgs, then with the launching user. Non-expired purchased licences are preferred over EVAL licences.
 
-2. **`helper_funcs.sh:download_license_token`** — Downloads the license record's JSON details via `dx describe`, base64-encodes them to `~/Sentieon_License_encrypt` (an atomic write via a temp file to avoid races).
+2. **`helper_funcs.sh:download_license_token`** — Downloads the licence record's JSON details via `dx describe`, base64-encodes them to `~/Sentieon_License_encrypt` (an atomic write via a temp file to avoid races).
 
 3. **`license_auth.sh`** — Runs in the background as a refresh daemon (`while sleep 300; do download_license_token; done`), keeping the license token current throughout the 24-hour job window.
 
-4. **`license_setup.sh`** — Resolves the license server address (from the token, or from a Sentieon S3 endpoint, or falls back to `master.sentieon.com:9010`), then exports:
+4. **`license_setup.sh`** — Resolves the licence server address (from the token, or from a Sentieon S3 endpoint, or falls back to `master.sentieon.com:9010`), then exports:
    - `SENTIEON_LICENSE` — host:port of the license server
    - `SENTIEON_AUTH_MECH=dnanexus_app` — authentication mechanism
    - `SENTIEON_AUTH_DATA` — path to the base64-encoded token
    - `SENTIEON_JOB_TAG` — job identifier for audit logging
 
-5. **License ping** — `sentieon licclnt ping` is called before any compute starts; an informative error message is reported and the job fails fast if the license is invalid.
+5. **Licence ping** — `sentieon licclnt ping` is called before any compute starts; an informative error message is reported and the job fails fast if the licence is invalid.
 
 ## Bundled Software
 
-All bioinformatics tools are shipped inside `resources/`, so no internet-based package install is needed for the tools themselves.
+All bioinformatics tools are shipped inside `resources/`, so no internet-based package installation is needed for the tools themselves.
 
 <details>
 <summary>Sentieon libexec binaries and shared libraries</summary>

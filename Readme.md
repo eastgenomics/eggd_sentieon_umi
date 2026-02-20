@@ -61,4 +61,4 @@ This app performs the following steps:
 
 ## Further details
 
-For a full technical walkthrough of the codebase — including annotated pipeline steps, input/output specification, license management, and bundled software — see [technical_walkthrough.md](technical_walkthrough.md).
+For a full technical walkthrough of the codebase — including annotated pipeline steps, input/output specification, licence management, and bundled software — see [technical_walkthrough.md](technical_walkthrough.md).

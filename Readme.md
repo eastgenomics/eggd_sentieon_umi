@@ -59,3 +59,6 @@ This app performs the following steps:
 - Runs Sentieon umi consensus to create consensus molecules from aligned barcode-tagged reads.
 - Runs BWA to map the consensus reads to the reference and sorts the output.
 
+## Further details
+
+For a full technical walkthrough of the codebase — including annotated pipeline steps, input/output specification, licence management, and bundled software — see [technical_walkthrough.md](technical_walkthrough.md).
